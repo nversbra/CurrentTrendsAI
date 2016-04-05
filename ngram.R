@@ -50,29 +50,25 @@ computeNgrams <- function(n, data) {
 ## the table has dimensions of the (value range)^n (lowest occuring note/duration to highest occuring note/duration in the dataset) to reduce the dimensionality 
 ## (otherwise it would e.g. have dimenions of (127)^n, with 127 the full MIDI note range)
 countNgrams <- function(ngrams, valRange, minVal){
-  counts <- array(rep(0, valRange*valRange*valRange*valRange*valRange), dim=c(valRange, valRange, valRange,valRange,valRange))
+  counts <- array(rep(0, valRange*valRange*valRange), dim=c(valRange, valRange, valRange))
   for(index in 1:length(ngrams)) {
     #map the notes to the noterange or durationrange (e.g. when the note is 65 and the note range is 45-95, then the note maps to index 20)
-    counts[ngrams[[index]][1] - minVal, ngrams[[index]][2] - minVal, ngrams[[index]][3] - minVal, ngrams[[index]][4] - minVal, ngrams[[index]][5] - minVal  ] <- counts[ngrams[[index]][1] - minVal, ngrams[[index]][2] - minVal, ngrams[[index]][3] - minVal, ngrams[[index]][4] - minVal , ngrams[[index]][5] - minVal ] + 1/length(ngrams)
+    counts[ngrams[[index]][1] - minVal, ngrams[[index]][2] - minVal, ngrams[[index]][3] - minVal ] <- counts[ngrams[[index]][1] - minVal, ngrams[[index]][2] - minVal, ngrams[[index]][3] - minVal] + 1/length(ngrams)
   }
   return(counts)
 }
 
 
 dissimilarity <- function(song1, song2, noteRange, minNote){
-  ngrams1 <- computeNgrams(5,song1)
-  ngrams2 <- computeNgrams(5,song2)
+  ngrams1 <- computeNgrams(3,song1)
+  ngrams2 <- computeNgrams(3,song2)
   counts1 <- countNgrams(ngrams1, noteRange, minNote)
   counts2 <- countNgrams(ngrams2, noteRange, minNote)
   dissim <- 0
   for(i in 1:noteRange){
     for(j in 1:noteRange){
       for(k in 1:noteRange){
-           for(l in 1:noteRange){
-                for(m in 1:noteRange){
-        dissim <- dissim + (counts1[i,j,k,l,m]-counts2[i,j,k,l,m])^2
-                }
-           }
+        dissim <- dissim + (counts1[i,j,k]-counts2[i,j,k])^2
       }
     }
   }
@@ -86,7 +82,7 @@ songs <- list()
 maxVal <- 0
 #minVal <- 127 #largest midi note number
 minVal <- 1000 #presumably larger than the longest note duration
-print("songstuff: \n")
+
 for (s in 1:numberOfSongs){
   print(s)
   songs[[s]] <-  inputSong(paste0("songs-csv/",toString(s),".csv"), "durations")
@@ -100,27 +96,22 @@ for (s in 1:numberOfSongs){
   }
     
 }
-print("songstuff: \n")
+# 
 valRange <- maxVal - minVal 
-print("songstuff: \n")
+
 dissimMatrix <- array(rep(NaN, numberOfSongs*numberOfSongs), dim=c(numberOfSongs, numberOfSongs))
-print("matrixdone: \n")
+
 for (i in 1:numberOfSongs){
   for (j in 1:numberOfSongs){
     if (i <= j)
-    	{ print(i)
-    		print(j)
-      dissimMatrix[i,j] <- dissimilarity(songs[[i]], songs[[j]], valRange, minVal)}
-    else {
-    	print(i)
-    	    		print(j)
-      dissimMatrix[i,j] <- dissimMatrix[j,i]}
+      dissimMatrix[i,j] <- dissimilarity(songs[[i]], songs[[j]], valRange, minVal)
+    else 
+      dissimMatrix[i,j] <- dissimMatrix[j,i]
   }
 }
-print("valrange: \n")
+
 print(valRange)
-print("dissim: \n")
-print(dissimMatrix)
+#print(dissimMatrix)
 myImagePlot(dissimMatrix)
 
 
