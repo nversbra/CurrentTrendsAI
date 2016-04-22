@@ -1,0 +1,10 @@
+
+
+
+*.txt
+
+*.ipynb
+
+*.pbxproj
+
+ATAI/ATAI.xcodeproj/*
