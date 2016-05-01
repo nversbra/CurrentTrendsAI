@@ -1,10 +1,13 @@
 from simple_esn import SimpleESN
 from sklearn.svm import SVR
 from sklearn.metrics import mean_squared_error
+from itertools import groupby
 import matplotlib.pyplot as plt
 from array import array
 import numpy as np
 import csv
+
+
 
 
 
@@ -25,7 +28,8 @@ def inputSong( filename ):
                 if not(headerBegin <= rownum <= headerEnd) and (rownum % 2 == 0):
                         #last two rows of csv, marking the end, have no columns with data of the song (numcols < 4)
                         if not (len(row)<4):
-                                songList.append(float(row[column_of_notes].strip())/maxMidiNote)                       
+                                #scale the values to range -1 to 1
+                                songList.append(float(row[column_of_notes].strip())/maxMidiNote * 2 - 1)                       
                 rownum += 1
         song = np.asarray(songList)
         ifile.close()
@@ -37,46 +41,33 @@ def padWithZeros(song, neededSize):
         return np.append(song, zeros);
 
 
-# temporary (& very ugly) fix
-songsArtPepperIndices = [1, 2, 3, 4, 5]
-songsBennyCarterIndices = [7, 8, 9, 10, 11]
-##maxLengthOfSong = 0
-##
-##for i in songsArtPepperIndices:
-##        filename = "songs-csv/" + str(i) + ".csv"
-##        song = inputSong(filename)
-##        if song.shape[0] > maxLengthOfSong:
-##                maxLengthOfSong = song.shape[0]
-##
-##for i in songsBennyCarterIndices:
-##        filename = "songs-csv/" + str(i) + ".csv"
-##        song = inputSong(filename)
-##        if song.shape[0] > maxLengthOfSong:
-##                maxLengthOfSong = song.shape[0]
-##
-##
-##print("longest song has " + str(maxLengthOfSong) + " notes")
 
-maxLengthOfSong = 1000;
+overviewFile  = open("dataset-balanced.csv", "rt")
+reader = csv.reader(overviewFile, delimiter=';')
+songsOverviewList = []
+for row in reader:
+        songsOverviewList.append(row)
+del songsOverviewList[0] #remove header
+songsOverview = np.asarray(songsOverviewList)
 
-songsArtPepper = np.ndarray(shape=(5, maxLengthOfSong), dtype=float, order='F')
-songsBennyCarter = np.ndarray(shape=(5, maxLengthOfSong), dtype=float, order='F')
 
-for i in songsArtPepperIndices:
-        filename = "songs-csv/" + str(i) + ".csv"
-        song = inputSong(filename)
-        songsArtPepper[i-1] = padWithZeros(song, maxLengthOfSong)
+maxLengthOfSong = 1953 #longest song has 1953 notes
+songs = np.ndarray(shape=(181, maxLengthOfSong), dtype=float, order='F')
+index = 0;
+for songInfo in songsOverview:
+        songId = songInfo[0]
+        filename = "songs-csv/" + str(songId) + ".csv"
+        song = padWithZeros(inputSong(filename), maxLengthOfSong)
+        songs[index] = song
+        songInfo[0] = index #changes the indices in the overview to the 0-179 indices in the array of songs
+        index = index + 1
 
-for i in songsBennyCarterIndices:
-        filename = "songs-csv/" + str(i) + ".csv"
-        song = inputSong(filename)
-        songsBennyCarter[i-7] = padWithZeros(song, maxLengthOfSong)
 
-signalArtPepper = np.empty(maxLengthOfSong)
-signalArtPepper.fill(1) #constant signal y=0.2
 
-signalBennyCarter = np.empty(maxLengthOfSong)
-signalBennyCarter.fill(-1) #constant signal y=0.8
+# create 3D array where members of same class are grouped together, e.g. [ [ [..., 'art pepper', ..., ...], [..., 'art pepper', ..., ...] ], [ [..., 'benny carter', ..., ...], [..., 'benny carter', ..., ...] ] ]
+def groupBy(datasetOverview, className):
+        if (className == "composer"):
+                return [list(g) for k, g in groupby(datasetOverview, lambda x:x[1])]
 
 
 
@@ -90,7 +81,6 @@ esn = SimpleESN(n_readout = 1)
 def collectEchoes( inputSongs ):
         #create 2D array with size n_samples (=length of song) * n_features (=number of songs)
         inputToReservoir = np.transpose(inputSongs)#np.ndarray(shape=(maxLengthOfSong,n_features), dtype=float, order='F')
-        print(inputToReservoir.shape)
         echoes = esn.fit_transform(inputToReservoir)
         #print(echoes)
         return echoes;
@@ -102,6 +92,7 @@ def collectEchoes( inputSongs ):
 def learnSignature( echoes, composerSignal ):
         svr = SVR(kernel='linear', C=1e3, gamma=0.1) #Support Vector Regression, linear since target signal is linear 
         trainedSVR = svr.fit(echoes, composerSignal)
+        #print(trainedSVR.coef_)
         return trainedSVR;
 
 
@@ -115,23 +106,44 @@ def dissimilarity( echoesOfNewSong, trainedSVR, trueSignal):
         err = mean_squared_error(trueSignal, predictedSignal)
         return err;
         
-        
+
+all_indices = np.arange(180)
+test_indices = all_indices[::5]
+train_indices = np.delete(all_indices, test_indices)
+
+songs_test = songs[test_indices]
+songs_train = songs[train_indices]
+targets_test = songsOverview[test_indices]
+targets_train = songsOverview[train_indices]
+
+
+targetsGroupedByComposer = groupBy(targets_train, "composer")
+xAxis = np.arange(maxLengthOfSong)
+
+print(targetsGroupedByComposer[2][1])
+print(songs_train[11])
+
+colorIndex = 0
+
+for composer in targetsGroupedByComposer:
+        color = [1, 1, colorIndex * 1/36]
+        for songMetaData in composer:
+                i = songMetaData[0]
+                print(i)
+                print(songs_train[11])
+                print(songs_train[i]) ####### ??????????? when i = 11 this does not give the same result as songs_train[11]
+                echoes = collectEchoes( np.array(songs_train[i], ndmin=2) )
+                print(len(xAxis))
+                print(len(echoes.flatten()))
+                #print(songMetaData)
+                #print(songs_train[index])
+                plt.scatter(xAxis, echoes.flatten(), c=color, label=songMetaData[1])
+        colorIndex = colorIndex + 1
+
+plt.show()
 
 
 
-echoesArtPepper = collectEchoes( songsArtPepper )
-signatureArtPepper = learnSignature (echoesArtPepper, signalArtPepper )
-
-echoesBennyCarter = collectEchoes( songsBennyCarter )
-signatureBennyCarter = learnSignature (echoesBennyCarter, signalBennyCarter )
-
-newSong = inputSong("songs-csv/6.csv") #sixth song of Art Pepper (normally not in dataset)
-newSong = padWithZeros(newSong, maxLengthOfSong)
-songArray = np.array(newSong, ndmin=2)
-echoesNewSong = collectEchoes(songArray)
-
-print( dissimilarity(echoesNewSong, signatureArtPepper, signalArtPepper))
-print( dissimilarity(echoesNewSong, signatureBennyCarter, signalBennyCarter))
 
 
 
@@ -144,7 +156,7 @@ print( dissimilarity(echoesNewSong, signatureBennyCarter, signalBennyCarter))
 #plt.scatter(xAxis, echoes.flatten(), c='g', label='echoes')
 #plt.plot(xAxis, y_rbf, c='y', label='regression')
 #plt.legend()
-#plt.show()
+
 
 
 
