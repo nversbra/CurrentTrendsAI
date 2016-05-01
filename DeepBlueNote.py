@@ -16,20 +16,26 @@ import csv
 ### Process a CSV file
 # currently only with notes 
 def inputSong( filename ):
-        songList = [] #starting with list to avoid storage move 
+        songList = [] #starting with list to avoid storage move
+        songRhytm=[]
         headerBegin = 0
         headerEnd = 6
         column_of_notes = 4
+        column_of_rhythm = 1
         maxMidiNote = 127
         ifile  = open(filename, "rt")
         reader = csv.reader(ifile)
-        rownum = 0
+        rownum = 1
+        noteOnTime=0
         for row in reader:
-                if not(headerBegin <= rownum <= headerEnd) and (rownum % 2 == 0):
-                        #last two rows of csv, marking the end, have no columns with data of the song (numcols < 4)
-                        if not (len(row)<4):
-                                #scale the values to range -1 to 1
-                                songList.append(float(row[column_of_notes].strip())/maxMidiNote * 2 - 1)                       
+                if not (headerBegin <= rownum <= headerEnd) and not (len(row) < 4):
+                    #last two rows of csv, marking the end, have no columns with data of the song (numcols < 4)
+                    #scale the values to range -1 to 1
+                    if (rownum % 2 == 1):
+                        noteOnTime=int (row[column_of_rhythm])
+                    if (rownum % 2 == 0):
+                      songList.append(float(row[column_of_notes].strip())/maxMidiNote * 2 - 1)
+                      songRhytm.append(int(row[column_of_rhythm])-int(noteOnTime))
                 rownum += 1
         song = np.asarray(songList)
         ifile.close()

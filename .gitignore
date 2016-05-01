@@ -12,3 +12,8 @@ ATAI/*
 DeepBlueNotec/DeepBlueNote.xcodeproj/*
 
 .idea/*
+build/*
+
+DeepBlueNote.spec
+
+dist/DeepBlueNote/
