@@ -49,17 +49,18 @@ for row in reader:
         songsOverviewList.append(row)
 del songsOverviewList[0] #remove header
 songsOverview = np.asarray(songsOverviewList)
+print("number of songs: " + str(songsOverview.shape[0]))
 
 
 maxLengthOfSong = 1953 #longest song has 1953 notes
-songs = np.ndarray(shape=(181, maxLengthOfSong), dtype=float, order='F')
+songs = np.ndarray(shape=(180, maxLengthOfSong), dtype=float, order='F')
 index = 0;
 for songInfo in songsOverview:
         songId = songInfo[0]
         filename = "songs-csv/" + str(songId) + ".csv"
         song = padWithZeros(inputSong(filename), maxLengthOfSong)
         songs[index] = song
-        songInfo[0] = index #changes the indices in the overview to the 0-179 indices in the array of songs
+        songInfo[0] = int(index) #changes the indices in the overview to the 0-179 indices in the array of songs
         index = index + 1
 
 
@@ -111,33 +112,26 @@ all_indices = np.arange(180)
 test_indices = all_indices[::5]
 train_indices = np.delete(all_indices, test_indices)
 
-songs_test = songs[test_indices]
-songs_train = songs[train_indices]
-targets_test = songsOverview[test_indices]
-targets_train = songsOverview[train_indices]
+test = songsOverview[test_indices]
+train = songsOverview[train_indices]
 
 
-targetsGroupedByComposer = groupBy(targets_train, "composer")
+targetsGroupedByComposer = groupBy(train, "composer")
 xAxis = np.arange(maxLengthOfSong)
 
-print(targetsGroupedByComposer[2][1])
-print(songs_train[11])
 
 colorIndex = 0
 
+
 for composer in targetsGroupedByComposer:
-        color = [1, 1, colorIndex * 1/36]
+        color = [colorIndex * 0.1, colorIndex * 0.1, colorIndex * 0.1]
+        #print("**************") 
+        #print(colorIndex)
         for songMetaData in composer:
                 i = int(songMetaData[0])
-                print(i)
-                print(songs_train[11])
-                print(songs_train[i]) ####### ??????????? when i = 11 this does not give the same result as songs_train[11]
-                echoes = collectEchoes( np.array(songs_train[i], ndmin=2) )
-                print(len(xAxis))
-                print(len(echoes.flatten()))
-                #print(songMetaData)
-                #print(songs_train[index])
-                plt.scatter(xAxis, echoes.flatten(), c=color, label=songMetaData[1])
+                if (i < 36) :
+                        echoes = collectEchoes( np.array(songs[i], ndmin=2) )
+                        plt.scatter(xAxis, echoes.flatten(), c=color, label=songMetaData[1])
         colorIndex = colorIndex + 1
 
 plt.show()
