@@ -128,7 +128,7 @@ colorIndex = 0
 for composer in targetsGroupedByComposer:
         color = [1, 1, colorIndex * 1/36]
         for songMetaData in composer:
-                i = songMetaData[0]
+                i = int(songMetaData[0])
                 print(i)
                 print(songs_train[11])
                 print(songs_train[i]) ####### ??????????? when i = 11 this does not give the same result as songs_train[11]

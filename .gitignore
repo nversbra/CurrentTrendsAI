@@ -5,6 +5,10 @@
 
 *.ipynb
 
-*.pbxproj
 
-ATAI/ATAI.xcodeproj/*
+ATAI/*
+
+
+DeepBlueNotec/DeepBlueNote.xcodeproj/*
+
+.idea/*
