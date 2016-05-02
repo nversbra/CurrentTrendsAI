@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from array import array
 import numpy as np
 import csv
+import random
+
 
 
 
@@ -58,7 +60,7 @@ songsOverview = np.asarray(songsOverviewList)
 print("number of songs: " + str(songsOverview.shape[0]))
 
 
-maxLengthOfSong = 1953 #longest song has 1953 notes
+maxLengthOfSong = 1954 #longest song has 1954 notes
 songs = np.ndarray(shape=(180, maxLengthOfSong), dtype=float, order='F')
 index = 0;
 for songInfo in songsOverview:
@@ -75,6 +77,12 @@ for songInfo in songsOverview:
 def groupBy(datasetOverview, className):
         if (className == "composer"):
                 return [list(g) for k, g in groupby(datasetOverview, lambda x:x[1])]
+        elif (className == "instrument"):
+                return [list(g) for k, g in groupby(datasetOverview, lambda x:x[3])]
+        elif (className == "style"):
+                return [list(g) for k, g in groupby(datasetOverview, lambda x:x[4])]
+        elif (className == "year"):
+                return [list(g) for k, g in groupby(datasetOverview, lambda x:x[5])]
 
 
 
@@ -112,6 +120,34 @@ def dissimilarity( echoesOfNewSong, trainedSVR, trueSignal):
         predictedSignal = trainedSVR.predict(echoesOfNewSong)
         err = mean_squared_error(trueSignal, predictedSignal)
         return err;
+
+
+classIndices = [1, 3, 4, 5] # index of columns in overview file corresponding to different classes
+
+def predict(testSet):
+        fieldnames = ['id','Performer','Inst','Style','Year','Key']
+        outputFile = open('output-file.csv', 'w')
+        writer = csv.DictWriter(outputFile, fieldnames=fieldnames,  delimiter=";")
+        writer.writeheader()
+
+        possibleTargets = list() #list of possible targets (values to be predicted) per class
+        for i in np.arange(4):
+                possibleTargets.append([])
+                classIndex = classIndices[i]
+                possibleTargets[i] = np.unique(testSet[:,classIndex])
+
+        for s in np.arange(len(testSet)):
+                predictions = []
+                for c in possibleTargets:
+                        predictions.append(random.choice(c))
+                id = testSet[:,0][s]
+                writer.writerow({'id': id ,'Performer': predictions[0] ,'Inst': predictions[1],'Style': predictions[2],'Year': predictions[3],'Key' : "major"})
+
+ 
+           
+                
+                        
+        
         
 
 all_indices = np.arange(180)
@@ -128,19 +164,22 @@ xAxis = np.arange(maxLengthOfSong)
 
 colorIndex = 0
 
+colorList = plt.cm.Dark2(np.linspace(0, 1, 10))
 
-for composer in targetsGroupedByComposer:
-        color = [colorIndex * 0.1, colorIndex * 0.1, colorIndex * 0.1]
-        #print("**************") 
-        #print(colorIndex)
-        for songMetaData in composer:
-                i = int(songMetaData[0])
-                if (i < 36) :
-                        echoes = collectEchoes( np.array(songs[i], ndmin=2) )
-                        plt.scatter(xAxis, echoes.flatten(), c=color, label=songMetaData[1])
-        colorIndex = colorIndex + 1
+predict(test)
 
-plt.show()
+##for composer in targetsGroupedByComposer:
+##        #print("**************") 
+##        #print(colorIndex)
+##        for songMetaData in composer:
+##                i = int(songMetaData[0])
+##                if (i < 36) :
+##                        color = colorList[colorIndex]
+##                        echoes = collectEchoes( np.array(songs[i], ndmin=2) )
+##                        plt.plot(xAxis, echoes.flatten(), c=color, label=songMetaData[1])
+##        colorIndex = colorIndex + 1
+##
+##plt.show()
 
 
 
