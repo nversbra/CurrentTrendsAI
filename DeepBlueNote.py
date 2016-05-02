@@ -89,7 +89,7 @@ def groupBy(datasetOverview, className):
 ####################### Reservoir Part
 
 #fixed reservoir
-esn = SimpleESN(n_readout = 1)
+esn = SimpleESN(n_readout = 20)
 
 #### feed one or more songs to the reservoir and collect the echoes 
 
@@ -157,16 +157,49 @@ train_indices = np.delete(all_indices, test_indices)
 test = songsOverview[test_indices]
 train = songsOverview[train_indices]
 
+trainedSVRs = []
 
-targetsGroupedByComposer = groupBy(train, "composer")
-xAxis = np.arange(maxLengthOfSong)
+for s in np.arange(len(train)):
+        index = int(train[s, 0])
+        echoes = collectEchoes( np.array(songs[index], ndmin=2) )
+        #print(echoes.shape)
+        #print(songs[index].shape)
+        
+        trainedSVRs.append(learnSignature( echoes, songs[index] ))
+
+for s in np.arange(len(test)):
+        index = int(test[s, 0])
+        echoesNewSong = collectEchoes( np.array(songs[index], ndmin=2) )
+        errors = []
+        for i in np.arange(len(train)):
+                errors.append(dissimilarity( echoesNewSong, trainedSVRs[i], songs[i] ))
+
+        print("*********************************************")
+        print("")
+        print("Test song with index: " + str(test[s, 0]) + " is closest to the training song with index " + str(train[np.argmin(errors), 0]))
+        print("")
+        print("test song:")
+        print(test[s])
+        print("train song:")
+        print(train[s])
+        
+        
+              
+                
+                
+                
+                
 
 
-colorIndex = 0
-
-colorList = plt.cm.Dark2(np.linspace(0, 1, 10))
-
-predict(test)
+##targetsGroupedByComposer = groupBy(train, "composer")
+##xAxis = np.arange(maxLengthOfSong)
+##
+##
+##colorIndex = 0
+##
+##colorList = plt.cm.Dark2(np.linspace(0, 1, 10))
+##
+##predict(test)
 
 ##for composer in targetsGroupedByComposer:
 ##        #print("**************") 
