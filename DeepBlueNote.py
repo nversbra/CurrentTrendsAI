@@ -7,7 +7,7 @@ from array import array
 import numpy as np
 import csv
 import random
-
+import sys
 
 
 
@@ -49,29 +49,48 @@ def padWithZeros(song, neededSize):
         return np.append(song, zeros);
 
 
+training_data_file = sys.argv[1]
+test_data_file = sys.argv[2]
+output_file = sys.argv[3]
 
-overviewFile  = open("dataset-balanced.csv", "rt")
-reader = csv.reader(overviewFile, delimiter=';')
-songsOverviewList = []
-for row in reader:
-        songsOverviewList.append(row)
-del songsOverviewList[0] #remove header
-songsOverview = np.asarray(songsOverviewList)
-print("number of songs: " + str(songsOverview.shape[0]))
+def readDataFile(datafile):
+    overviewFile  = open(datafile, "rt")
+    reader = csv.reader(overviewFile, delimiter=';')
+    songsOverviewList = []
+    for row in reader:
+            songsOverviewList.append(row)
+    del songsOverviewList[0] #remove header
+    songsOverview = np.asarray(songsOverviewList)
+    print("number of songs: " + str(songsOverview.shape[0]))
+    return songsOverview
+
+
+training_data = readDataFile(training_data_file)
+test_data = readDataFile(test_data_file)
 
 
 maxLengthOfSong = 1954 #longest song has 1954 notes
-songs = np.ndarray(shape=(180, maxLengthOfSong), dtype=float, order='F')
+trainsongs = np.ndarray(shape=(training_data.shape[0], maxLengthOfSong), dtype=float, order='F')
+testsongs = np.ndarray(shape=(test_data.shape[0], maxLengthOfSong), dtype=float, order='F')
+
+
 index = 0;
-for songInfo in songsOverview:
+for songInfo in training_data:
         songId = songInfo[0]
         filename = "songs-csv/" + str(songId) + ".csv"
         song = padWithZeros(inputSong(filename), maxLengthOfSong)
-        songs[index] = song
+        trainsongs[index] = song
         songInfo[0] = int(index) #changes the indices in the overview to the 0-179 indices in the array of songs
         index = index + 1
 
-
+index = 0;
+for songInfo in test_data:
+    songId = songInfo[0]
+    filename = "songs-csv/" + str(songId) + ".csv"
+    song = padWithZeros(inputSong(filename), maxLengthOfSong)
+    testsongs[index] = song
+    songInfo[0] = int(index)  # changes the indices in the overview to the 0-179 indices in the array of songs
+    index = index + 1
 
 # create 3D array where members of same class are grouped together, e.g. [ [ [..., 'art pepper', ..., ...], [..., 'art pepper', ..., ...] ], [ [..., 'benny carter', ..., ...], [..., 'benny carter', ..., ...] ] ]
 def groupBy(datasetOverview, className):
@@ -154,35 +173,38 @@ all_indices = np.arange(180)
 test_indices = all_indices[::5]
 train_indices = np.delete(all_indices, test_indices)
 
-test = songsOverview[test_indices]
-train = songsOverview[train_indices]
+#test = songsOverview[test_indices]
+#train = songsOverview[train_indices]
 
 trainedSVRs = []
 
-for s in np.arange(len(train)):
-        index = int(train[s, 0])
-        echoes = collectEchoes( np.array(songs[index], ndmin=2) )
+for s in np.arange(len(training_data)):
+        index = int(training_data[s, 0])
+        echoes = collectEchoes( np.array(trainsongs[index], ndmin=2) )
         #print(echoes.shape)
         #print(songs[index].shape)
         
-        trainedSVRs.append(learnSignature( echoes, songs[index] ))
-
-for s in np.arange(len(test)):
-        index = int(test[s, 0])
-        echoesNewSong = collectEchoes( np.array(songs[index], ndmin=2) )
+        trainedSVRs.append(learnSignature( echoes, trainsongs[index] ))
+outFile = open(output_file, 'w')
+for s in np.arange(len(test_data)):
+        index = int(test_data[s, 0])
+        echoesNewSong = collectEchoes( np.array(testsongs[index], ndmin=2) )
         errors = []
-        for i in np.arange(len(train)):
-                errors.append(dissimilarity( echoesNewSong, trainedSVRs[i], songs[i] ))
+        for i in np.arange(len(training_data)):
+                errors.append(dissimilarity( echoesNewSong, trainedSVRs[i], trainsongs[i] ))
 
         print("*********************************************")
         print("")
-        print("Test song with index: " + str(test[s, 0]) + " is closest to the training song with index " + str(train[np.argmin(errors), 0]))
+        print("Test song with index: " + str(test_data[s, 0]) + " is closest to the training song with index " + str(training_data[np.argmin(errors), 0]))
         print("")
         print("test song:")
-        print(test[s])
+        print(test_data[s])
         print("train song:")
-        print(train[s])
-        
+        print(training_data[s])
+        pred=training_data[s]
+        outFile.write(pred[1]+";"+pred[4]+";"+pred[5]+";"+pred[6]+"\n")
+
+#write it to outputfile
         
               
                 
