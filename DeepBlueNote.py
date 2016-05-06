@@ -61,7 +61,7 @@ def readDataFile(datafile):
             songsOverviewList.append(row)
     del songsOverviewList[0] #remove header
     songsOverview = np.asarray(songsOverviewList)
-    print("number of songs: " + str(songsOverview.shape[0]))
+    #print("number of songs: " + str(songsOverview.shape[0]))
     return songsOverview
 
 
@@ -169,9 +169,9 @@ def predict(testSet):
         
         
 
-all_indices = np.arange(180)
-test_indices = all_indices[::5]
-train_indices = np.delete(all_indices, test_indices)
+##all_indices = np.arange(180)
+##test_indices = all_indices[::5]
+##train_indices = np.delete(all_indices, test_indices)
 
 #test = songsOverview[test_indices]
 #train = songsOverview[train_indices]
@@ -183,8 +183,8 @@ for s in np.arange(len(training_data)):
         echoes = collectEchoes( np.array(trainsongs[index], ndmin=2) )
         #print(echoes.shape)
         #print(songs[index].shape)
-        
         trainedSVRs.append(learnSignature( echoes, trainsongs[index] ))
+        
 outFile = open(output_file, 'w')
 for s in np.arange(len(test_data)):
         index = int(test_data[s, 0])
@@ -193,16 +193,18 @@ for s in np.arange(len(test_data)):
         for i in np.arange(len(training_data)):
                 errors.append(dissimilarity( echoesNewSong, trainedSVRs[i], trainsongs[i] ))
 
-        print("*********************************************")
-        print("")
-        print("Test song with index: " + str(test_data[s, 0]) + " is closest to the training song with index " + str(training_data[np.argmin(errors), 0]))
-        print("")
-        print("test song:")
-        print(test_data[s])
-        print("train song:")
-        print(training_data[s])
-        pred=training_data[s]
-        outFile.write(pred[1]+";"+pred[4]+";"+pred[5]+";"+pred[6]+"\n")
+##        print("*********************************************")
+##        print("")
+##        print("Test song with index: " + str(test_data[s, 0]) + " is closest to the training song with index " + str(training_data[np.argmin(errors), 0]))
+##        print("")
+##        print("test song:")
+##        print(test_data[s])
+##        print("train song:")
+##        print(training_data[s])
+        #print( np.argmin(errors) )
+        pred=training_data[np.argmin(errors), ]
+        #print(pred)
+        outFile.write(pred[1]+";"+ pred[3] + ";" + pred[4]+";"+pred[5]+";" +  pred[6] +"\n")
 
 #write it to outputfile
         
