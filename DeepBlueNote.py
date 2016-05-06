@@ -15,6 +15,15 @@ import sys
 
 ######################### Setup Part
 
+possibleDurationValues = [2, 3/2, 1, 3/4, 1/2, 3/8, 1/4, 3/16, 1/8, 3/32, 1/16, 3/64, 1/32, 3/128, 1/64]
+
+def mapDuration(noteTime):
+        duration = noteTime / 12 / 64
+        print(abs(possibleDurationValues - noteTime))
+        duration_index = np.argmin(abs(possibleDurationValues - noteTime))
+        return(possibleDurationValues[duration_index])
+        
+
 ### Process a CSV file
 # currently only with notes 
 def inputSong( filename ):
@@ -32,12 +41,12 @@ def inputSong( filename ):
         for row in reader:
                 if not (headerBegin <= rownum <= headerEnd) and not (len(row) < 4):
                     #last two rows of csv, marking the end, have no columns with data of the song (numcols < 4)
-                    #scale the values to range -1 to 1
                     if (rownum % 2 == 1):
                         noteOnTime=int (row[column_of_rhythm])
                     if (rownum % 2 == 0):
-                      songList.append(float(row[column_of_notes].strip())/maxMidiNote * 2 - 1)
-                      songRhytm.append(int(row[column_of_rhythm])-int(noteOnTime))
+                      songList.append(float(row[column_of_notes].strip())/maxMidiNote * 2 - 1) #scale the values to range -1 to 1
+                      noteTime = int(row[column_of_rhythm])-int(noteOnTime)
+                      songRhytm.append(mapDuration(noteTime))
                 rownum += 1
         song = np.asarray(songList)
         ifile.close()
