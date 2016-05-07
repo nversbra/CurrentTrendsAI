@@ -19,16 +19,16 @@ possibleDurationValues = [2, 3/2, 1, 3/4, 1/2, 3/8, 1/4, 3/16, 1/8, 3/32, 1/16, 
 
 def mapDuration(noteTime):
         duration = noteTime / 12 / 64
-        print(abs(possibleDurationValues - noteTime))
-        duration_index = np.argmin(abs(possibleDurationValues - noteTime))
+        compareArray = np.full(15, duration)
+        duration_index = np.argmin(abs(possibleDurationValues - compareArray))
         return(possibleDurationValues[duration_index])
         
 
 ### Process a CSV file
 # currently only with notes 
 def inputSong( filename ):
-        songList = [] #starting with list to avoid storage move
-        songRhytm=[]
+        songNotes = [] #starting with list to avoid storage move
+        songRhytm = []
         headerBegin = 0
         headerEnd = 6
         column_of_notes = 4
@@ -44,13 +44,14 @@ def inputSong( filename ):
                     if (rownum % 2 == 1):
                         noteOnTime=int (row[column_of_rhythm])
                     if (rownum % 2 == 0):
-                      songList.append(float(row[column_of_notes].strip())/maxMidiNote * 2 - 1) #scale the values to range -1 to 1
+                      songNotes.append(float(row[column_of_notes].strip())/maxMidiNote) #scale the values to range 0 to 1
                       noteTime = int(row[column_of_rhythm])-int(noteOnTime)
-                      songRhytm.append(mapDuration(noteTime))
+                      songRhytm.append(mapDuration(noteTime) / 2 ) #scale the values to range 0 to 1
                 rownum += 1
-        song = np.asarray(songList)
+        rhythm = np.asarray(songRhytm)
+        notes = np.asarray(songNotes)
         ifile.close()
-        return song;
+        return [notes, rhythm];
 
 def padWithZeros(song, neededSize):
         zerosNeeded = neededSize - song.shape[0]
@@ -79,16 +80,20 @@ test_data = readDataFile(test_data_file)
 
 
 maxLengthOfSong = 1954 #longest song has 1954 notes
-trainsongs = np.ndarray(shape=(training_data.shape[0], maxLengthOfSong), dtype=float, order='F')
-testsongs = np.ndarray(shape=(test_data.shape[0], maxLengthOfSong), dtype=float, order='F')
+trainSongsNotes = np.ndarray(shape=(training_data.shape[0], maxLengthOfSong), dtype=float, order='F')
+trainSongsRhythm = np.ndarray(shape=(training_data.shape[0], maxLengthOfSong), dtype=float, order='F')
+testSongsNotes = np.ndarray(shape=(test_data.shape[0], maxLengthOfSong), dtype=float, order='F')
+testSongsRhythm = np.ndarray(shape=(test_data.shape[0], maxLengthOfSong), dtype=float, order='F')
 
 
 index = 0;
+
 for songInfo in training_data:
         songId = songInfo[0]
         filename = "songs-csv/" + str(songId) + ".csv"
-        song = padWithZeros(inputSong(filename), maxLengthOfSong)
-        trainsongs[index] = song
+        songNotesAndRhythm = inputSong(filename) 
+        trainSongsNotes[index] = padWithZeros(songNotesAndRhythm[0], maxLengthOfSong)
+        trainSongsRhythm[index] = padWithZeros(songNotesAndRhythm[1], maxLengthOfSong)
         songInfo[0] = int(index) #changes the indices in the overview to the 0-179 indices in the array of songs
         index = index + 1
 
@@ -96,8 +101,9 @@ index = 0;
 for songInfo in test_data:
     songId = songInfo[0]
     filename = "songs-csv/" + str(songId) + ".csv"
-    song = padWithZeros(inputSong(filename), maxLengthOfSong)
-    testsongs[index] = song
+    songNotesAndRhythm = inputSong(filename) 
+    testSongsNotes[index] = padWithZeros(songNotesAndRhythm[0], maxLengthOfSong)
+    testSongsRhythm[index] = padWithZeros(songNotesAndRhythm[1], maxLengthOfSong)
     songInfo[0] = int(index)  # changes the indices in the overview to the 0-179 indices in the array of songs
     index = index + 1
 
@@ -117,13 +123,14 @@ def groupBy(datasetOverview, className):
 ####################### Reservoir Part
 
 #fixed reservoir
-esn = SimpleESN(n_readout = 20)
+n_readout =  10
+esn = SimpleESN(n_readout, damping = 0.3, weight_scaling = 0.9)
 
 #### feed one or more songs to the reservoir and collect the echoes 
 
-def collectEchoes( inputSongs ):
+def collectEchoes( inputToReservoir ):
         #create 2D array with size n_samples (=length of song) * n_features (=number of songs)
-        inputToReservoir = np.transpose(inputSongs)#np.ndarray(shape=(maxLengthOfSong,n_features), dtype=float, order='F')
+        #inputToReservoir = np.transpose(inputSongs)#np.ndarray(shape=(maxLengthOfSong,n_features), dtype=float, order='F')
         echoes = esn.fit_transform(inputToReservoir)
         #print(echoes)
         return echoes;
@@ -133,7 +140,7 @@ def collectEchoes( inputSongs ):
 
 ### perform the regression of the echoes to the target signal and save the learner (i.e., the regression coefficients)
 def learnSignature( echoes, composerSignal ):
-        svr = SVR(kernel='linear', C=1e3, gamma=0.1) #Support Vector Regression, linear since target signal is linear 
+        svr = SVR(kernel='rbf', C=1e3, gamma=0.1) #Support Vector Regression 
         trainedSVR = svr.fit(echoes, composerSignal)
         #print(trainedSVR.coef_)
         return trainedSVR;
@@ -152,24 +159,24 @@ def dissimilarity( echoesOfNewSong, trainedSVR, trueSignal):
 
 classIndices = [1, 3, 4, 5] # index of columns in overview file corresponding to different classes
 
-def predict(testSet):
-        fieldnames = ['id','Performer','Inst','Style','Year','Key']
-        outputFile = open('output-file.csv', 'w')
-        writer = csv.DictWriter(outputFile, fieldnames=fieldnames,  delimiter=";")
-        writer.writeheader()
-
-        possibleTargets = list() #list of possible targets (values to be predicted) per class
-        for i in np.arange(4):
-                possibleTargets.append([])
-                classIndex = classIndices[i]
-                possibleTargets[i] = np.unique(testSet[:,classIndex])
-
-        for s in np.arange(len(testSet)):
-                predictions = []
-                for c in possibleTargets:
-                        predictions.append(random.choice(c))
-                id = testSet[:,0][s]
-                writer.writerow({'id': id ,'Performer': predictions[0] ,'Inst': predictions[1],'Style': predictions[2],'Year': predictions[3],'Key' : "major"})
+##def predict(testSet):
+##        fieldnames = ['id','Performer','Inst','Style','Year','Key']
+##        outputFile = open('output-file.csv', 'w')
+##        writer = csv.DictWriter(outputFile, fieldnames=fieldnames,  delimiter=";")
+##        writer.writeheader()
+##
+##        possibleTargets = list() #list of possible targets (values to be predicted) per class
+##        for i in np.arange(4):
+##                possibleTargets.append([])
+##                classIndex = classIndices[i]
+##                possibleTargets[i] = np.unique(testSet[:,classIndex])
+##
+##        for s in np.arange(len(testSet)):
+##                predictions = []
+##                for c in possibleTargets:
+##                        predictions.append(random.choice(c))
+##                id = testSet[:,0][s]
+##                writer.writerow({'id': id ,'Performer': predictions[0] ,'Inst': predictions[1],'Style': predictions[2],'Year': predictions[3],'Key' : "major"})
 
  
            
@@ -185,37 +192,60 @@ def predict(testSet):
 #test = songsOverview[test_indices]
 #train = songsOverview[train_indices]
 
-trainedSVRs = []
+#trainedSVRs = []
+allEchoes = np.ndarray(shape=(len(training_data),maxLengthOfSong,n_readout), dtype=float, order='F') 
+
+print("training phase...")
 
 for s in np.arange(len(training_data)):
+        print(s)
         index = int(training_data[s, 0])
-        echoes = collectEchoes( np.array(trainsongs[index], ndmin=2) )
+        inputToReservoir = np.ndarray(shape=(maxLengthOfSong,1), dtype=float, order='F') 
+        inputToReservoir[:,0] = trainSongsNotes[s]
+        #inputToReservoir[:,1] = trainSongsRhythm[s]
+        #echoes = collectEchoes( np.array(trainsongs[index], ndmin=2) )
+        echoes = collectEchoes( inputToReservoir )
+        #print(echoes.shape)
         #print(echoes.shape)
         #print(songs[index].shape)
-        trainedSVRs.append(learnSignature( echoes, trainsongs[index] ))
+        #trainedSVRs.append(learnSignature( echoes, trainSongsNotes[index] ))
+        allEchoes[s] = echoes
+        #print(allEchoes.shape)
+
+print("predicting phase...")
         
 outFile = open(output_file, 'w')
 for s in np.arange(len(test_data)):
+        print(s)
         index = int(test_data[s, 0])
-        echoesNewSong = collectEchoes( np.array(testsongs[index], ndmin=2) )
+        inputToReservoir = np.ndarray(shape=(maxLengthOfSong,1), dtype=float, order='F') 
+        inputToReservoir[:,0] = testSongsNotes[s]
+        #inputToReservoir[:,1] = testSongsRhythm[s]
+        echoesNewSong = collectEchoes( inputToReservoir )
+        #print(echoes.shape)
         errors = []
         for i in np.arange(len(training_data)):
-                errors.append(dissimilarity( echoesNewSong, trainedSVRs[i], trainsongs[i] ))
-
-##        print("*********************************************")
-##        print("")
-##        print("Test song with index: " + str(test_data[s, 0]) + " is closest to the training song with index " + str(training_data[np.argmin(errors), 0]))
-##        print("")
-##        print("test song:")
-##        print(test_data[s])
-##        print("train song:")
-##        print(training_data[s])
+                #errors.append(dissimilarity( echoesNewSong, trainedSVRs[i], trainSongsNotes[i] ))
+                #print((allEchoes[i])[:,0].shape)
+        
+                
+                #echoesNew = np.ndarray(shape=(maxLengthOfSong,1), dtype=float, order='F')
+                #echoesNew[:,0] = echoesNewSong[:,0]
+                #print(echoesNew.shape)
+                #print(np.asarray(allEchoes[i][:,0]).shape)
+                
+                trainedSVR = learnSignature(echoesNewSong, allEchoes[i][:,0])
+                errors.append(dissimilarity( echoesNewSong, trainedSVR, (allEchoes[i])[:,0] ))
         #print( np.argmin(errors) )
         pred=training_data[np.argmin(errors), ]
         #print(pred)
         outFile.write(pred[1]+";"+ pred[3] + ";" + pred[4]+";"+pred[5]+";" +  pred[6] +"\n")
 
 #write it to outputfile
+
+
+
+        
         
               
                 
