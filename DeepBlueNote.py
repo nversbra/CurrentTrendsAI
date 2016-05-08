@@ -1,6 +1,9 @@
 from simple_esn import SimpleESN
 from sklearn.svm import SVR
 from sklearn.metrics import mean_squared_error
+from sklearn import tree
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier
 from itertools import groupby
 import matplotlib.pyplot as plt
 from array import array
@@ -124,7 +127,7 @@ def groupBy(datasetOverview, className):
 
 #fixed reservoir
 n_readout =  10
-esn = SimpleESN(n_readout, damping = 0.3, weight_scaling = 0.9)
+esn = SimpleESN(n_readout, damping = 0.9, weight_scaling = 0.9)
 
 #### feed one or more songs to the reservoir and collect the echoes 
 
@@ -193,24 +196,69 @@ classIndices = [1, 3, 4, 5] # index of columns in overview file corresponding to
 #train = songsOverview[train_indices]
 
 #trainedSVRs = []
-allEchoes = np.ndarray(shape=(len(training_data),maxLengthOfSong,n_readout), dtype=float, order='F') 
+
+allEchoes = np.ndarray(shape=(len(training_data),maxLengthOfSong,n_readout), dtype=float, order='F')
+
+echoSet = np.ndarray(shape=(len(training_data) * maxLengthOfSong, n_readout), dtype=float, order='F')
+targets = []
+possibleTargets = np.unique(training_data[:,1])
+
 
 print("training phase...")
 
+
+indexInEchoSet = 0
+
+indicesShuffled = list(range(len(training_data)))
+random.shuffle(indicesShuffled)
+
 for s in np.arange(len(training_data)):
         print(s)
-        index = int(training_data[s, 0])
+        index = indicesShuffled[s]
+        #if(s % 4 == 0):
+                #indexOfComposer += 1
+        #inputIndex = int(training_data[index, 0])
         inputToReservoir = np.ndarray(shape=(maxLengthOfSong,1), dtype=float, order='F') 
-        inputToReservoir[:,0] = trainSongsNotes[s]
+        inputToReservoir[:,0] = trainSongsNotes[index]
         #inputToReservoir[:,1] = trainSongsRhythm[s]
         #echoes = collectEchoes( np.array(trainsongs[index], ndmin=2) )
         echoes = collectEchoes( inputToReservoir )
+        target = training_data[index, 1]
+        for echo in echoes:
+                echoSet[indexInEchoSet, ] = echo
+                targets.append(target)
+                indexInEchoSet += 1
+        
         #print(echoes.shape)
         #print(echoes.shape)
         #print(songs[index].shape)
         #trainedSVRs.append(learnSignature( echoes, trainSongsNotes[index] ))
-        allEchoes[s] = echoes
+        #allEchoes[s] = echoes
         #print(allEchoes.shape)
+
+
+
+
+targets = np.asarray(targets)
+##targetsAsIntegersShuffled =  np.take(targetsAsIntegers, indices)
+##
+##echoSetShuffled = np.take(echoSet, indices, axis = 
+##
+##print(echoSet.shape)
+##print(targetsAsIntegersShuffled.shape)
+
+
+
+#decisionTree = tree.DecisionTreeClassifier(min_samples_leaf=1000)
+#decisionTree = decisionTree.fit(echoSet, targets)
+rf = RandomForestClassifier(max_depth=5, n_estimators=10, max_features=1)
+decisionTree = rf.fit(echoSet, targets)
+print(decisionTree.score(echoSet, targets))
+
+
+
+
+
 
 print("predicting phase...")
         
@@ -223,23 +271,35 @@ for s in np.arange(len(test_data)):
         #inputToReservoir[:,1] = testSongsRhythm[s]
         echoesNewSong = collectEchoes( inputToReservoir )
         #print(echoes.shape)
-        errors = []
-        for i in np.arange(len(training_data)):
+        #errors = []
+        #for i in np.arange(len(training_data)):
                 #errors.append(dissimilarity( echoesNewSong, trainedSVRs[i], trainSongsNotes[i] ))
                 #print((allEchoes[i])[:,0].shape)
-        
-                
+                       
                 #echoesNew = np.ndarray(shape=(maxLengthOfSong,1), dtype=float, order='F')
                 #echoesNew[:,0] = echoesNewSong[:,0]
                 #print(echoesNew.shape)
                 #print(np.asarray(allEchoes[i][:,0]).shape)
                 
-                trainedSVR = learnSignature(echoesNewSong, allEchoes[i][:,0])
-                errors.append(dissimilarity( echoesNewSong, trainedSVR, (allEchoes[i])[:,0] ))
+                #trainedSVR = learnSignature(echoesNewSong, allEchoes[i][:,0])
+                #errors.append(dissimilarity( echoesNewSong, trainedSVR, (allEchoes[i])[:,0] ))
         #print( np.argmin(errors) )
-        pred=training_data[np.argmin(errors), ]
+        #pred=training_data[np.argmin(errors), ]
         #print(pred)
-        outFile.write(pred[1]+";"+ pred[3] + ";" + pred[4]+";"+pred[5]+";" +  pred[6] +"\n")
+
+        numberOfComposers = 36
+        predictionProbabilities = np.zeros( numberOfComposers )
+        for echo in echoesNewSong:
+                predictionProbabilities =  predictionProbabilities + decisionTree.predict_proba(echo)
+
+        #print([x / maxLengthOfSong for x in predictionProbabilities])
+        composerIndex = np.argmax(predictionProbabilities)
+        print(composerIndex)
+        print("-----")
+        composer = possibleTargets[composerIndex]
+                
+        
+        outFile.write(composer+";" + ";" +";"+ ";"+"\n")
 
 #write it to outputfile
 
