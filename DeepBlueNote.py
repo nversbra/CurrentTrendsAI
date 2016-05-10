@@ -82,21 +82,26 @@ training_data = readDataFile(training_data_file)
 test_data = readDataFile(test_data_file)
 
 
-maxLengthOfSong = 1954 #longest song has 1954 notes
-trainSongsNotes = np.ndarray(shape=(training_data.shape[0], maxLengthOfSong), dtype=float, order='F')
-trainSongsRhythm = np.ndarray(shape=(training_data.shape[0], maxLengthOfSong), dtype=float, order='F')
-testSongsNotes = np.ndarray(shape=(test_data.shape[0], maxLengthOfSong), dtype=float, order='F')
-testSongsRhythm = np.ndarray(shape=(test_data.shape[0], maxLengthOfSong), dtype=float, order='F')
+##maxLengthOfSong = 1954 #longest song has 1954 notes
+##trainSongsNotes = np.ndarray(shape=(training_data.shape[0], maxLengthOfSong), dtype=float, order='F')
+##trainSongsRhythm = np.ndarray(shape=(training_data.shape[0], maxLengthOfSong), dtype=float, order='F')
+##testSongsNotes = np.ndarray(shape=(test_data.shape[0], maxLengthOfSong), dtype=float, order='F')
+##testSongsRhythm = np.ndarray(shape=(test_data.shape[0], maxLengthOfSong), dtype=float, order='F')
 
+
+trainSongsNotes = [] #using list to allow different song length
+testSongsNotes = [] #using list to allow different song length
 
 index = 0;
 
 for songInfo in training_data:
         songId = songInfo[0]
         filename = "songs-csv/" + str(songId) + ".csv"
-        songNotesAndRhythm = inputSong(filename) 
-        trainSongsNotes[index] = padWithZeros(songNotesAndRhythm[0], maxLengthOfSong)
-        trainSongsRhythm[index] = padWithZeros(songNotesAndRhythm[1], maxLengthOfSong)
+        songNotesAndRhythm = inputSong(filename)
+        trainSongsNotes.append([])
+        trainSongsNotes[index] = songNotesAndRhythm[0]
+        #trainSongsNotes[index] = padWithZeros(songNotesAndRhythm[0], maxLengthOfSong)
+  #      trainSongsRhythm[index] = padWithZeros(songNotesAndRhythm[1], maxLengthOfSong)
         songInfo[0] = int(index) #changes the indices in the overview to the 0-179 indices in the array of songs
         index = index + 1
 
@@ -104,9 +109,10 @@ index = 0;
 for songInfo in test_data:
     songId = songInfo[0]
     filename = "songs-csv/" + str(songId) + ".csv"
-    songNotesAndRhythm = inputSong(filename) 
-    testSongsNotes[index] = padWithZeros(songNotesAndRhythm[0], maxLengthOfSong)
-    testSongsRhythm[index] = padWithZeros(songNotesAndRhythm[1], maxLengthOfSong)
+    songNotesAndRhythm = inputSong(filename)
+    testSongsNotes.append([])
+    testSongsNotes[index] = songNotesAndRhythm[0]
+#    testSongsRhythm[index] = padWithZeros(songNotesAndRhythm[1], maxLengthOfSong)
     songInfo[0] = int(index)  # changes the indices in the overview to the 0-179 indices in the array of songs
     index = index + 1
 
@@ -126,8 +132,10 @@ def groupBy(datasetOverview, className):
 ####################### Reservoir Part
 
 #fixed reservoir
-n_readout =  10
-esn = SimpleESN(n_readout, damping = 0.9, weight_scaling = 0.9)
+n_readout =  1
+discard = 10
+esn = SimpleESN(n_readout, n_components = 4, damping = 0.5, weight_scaling = 0.7, random_state = 1, discard_steps = discard)
+
 
 #### feed one or more songs to the reservoir and collect the echoes 
 
@@ -135,6 +143,7 @@ def collectEchoes( inputToReservoir ):
         #create 2D array with size n_samples (=length of song) * n_features (=number of songs)
         #inputToReservoir = np.transpose(inputSongs)#np.ndarray(shape=(maxLengthOfSong,n_features), dtype=float, order='F')
         echoes = esn.fit_transform(inputToReservoir)
+        #print(np.amax(echoes))
         #print(echoes)
         return echoes;
 
@@ -197,15 +206,24 @@ classIndices = [1, 3, 4, 5] # index of columns in overview file corresponding to
 
 #trainedSVRs = []
 
-allEchoes = np.ndarray(shape=(len(training_data),maxLengthOfSong,n_readout), dtype=float, order='F')
+#allEchoes = np.ndarray(shape=(len(training_data),maxLengthOfSong,n_readout), dtype=float, order='F')
 
-echoSet = np.ndarray(shape=(len(training_data) * maxLengthOfSong, n_readout), dtype=float, order='F')
+numberOfSamples = 0 #count the total number of notes
+for song in np.arange(len(trainSongsNotes)):
+        numberOfSamples += len(trainSongsNotes[song]) - 1 - discard
+
+
+                
+
+echoSet = np.ndarray(shape=(numberOfSamples, n_readout), dtype=float, order='F')
 targets = []
-possibleTargets = np.unique(training_data[:,1])
+possibleTargets = list(np.unique(training_data[:,1]))
 
 
 print("training phase...")
 
+numberOfComposers = 36
+colorList = plt.cm.Dark2(np.linspace(0, 1, numberOfComposers))
 
 indexInEchoSet = 0
 
@@ -215,26 +233,28 @@ random.shuffle(indicesShuffled)
 for s in np.arange(len(training_data)):
         print(s)
         index = indicesShuffled[s]
-        #if(s % 4 == 0):
-                #indexOfComposer += 1
-        #inputIndex = int(training_data[index, 0])
-        inputToReservoir = np.ndarray(shape=(maxLengthOfSong,1), dtype=float, order='F') 
+        inputToReservoir = np.ndarray(shape=(len(trainSongsNotes[index]),1), dtype=float, order='F') 
         inputToReservoir[:,0] = trainSongsNotes[index]
-        #inputToReservoir[:,1] = trainSongsRhythm[s]
-        #echoes = collectEchoes( np.array(trainsongs[index], ndmin=2) )
+        #inputToReservoir[:,1] = trainSongsRhythm[index]
+        
         echoes = collectEchoes( inputToReservoir )
+        print(echoes.shape)
+        echoes = np.asarray([t - s for s, t in zip(echoes, echoes[1:])])
+        print(echoes.shape)
         target = training_data[index, 1]
+        targetAsInteger = possibleTargets.index(target)
+
+        xAxis = np.arange(len(trainSongsNotes[index])-discard-1)
+        plt.plot(xAxis, echoes[:,0].flatten(), color = colorList[targetAsInteger] )
         for echo in echoes:
                 echoSet[indexInEchoSet, ] = echo
                 targets.append(target)
                 indexInEchoSet += 1
-        
-        #print(echoes.shape)
-        #print(echoes.shape)
-        #print(songs[index].shape)
-        #trainedSVRs.append(learnSignature( echoes, trainSongsNotes[index] ))
-        #allEchoes[s] = echoes
-        #print(allEchoes.shape)
+
+
+
+
+
 
 
 
@@ -248,11 +268,12 @@ targets = np.asarray(targets)
 ##print(targetsAsIntegersShuffled.shape)
 
 
-
-#decisionTree = tree.DecisionTreeClassifier(min_samples_leaf=1000)
-#decisionTree = decisionTree.fit(echoSet, targets)
-rf = RandomForestClassifier(max_depth=5, n_estimators=10, max_features=1)
-decisionTree = rf.fit(echoSet, targets)
+print("number of samples: " + str(numberOfSamples))
+print(echoSet.shape)
+decisionTree = tree.DecisionTreeClassifier(min_samples_leaf=10)
+decisionTree = decisionTree.fit(echoSet, targets)
+#rf = RandomForestClassifier(max_depth=5, n_estimators=10, max_features=1)
+#decisionTree = rf.fit(echoSet, targets)
 print(decisionTree.score(echoSet, targets))
 
 
@@ -266,7 +287,7 @@ outFile = open(output_file, 'w')
 for s in np.arange(len(test_data)):
         print(s)
         index = int(test_data[s, 0])
-        inputToReservoir = np.ndarray(shape=(maxLengthOfSong,1), dtype=float, order='F') 
+        inputToReservoir = np.ndarray(shape=(len(testSongsNotes[s]),1), dtype=float, order='F') 
         inputToReservoir[:,0] = testSongsNotes[s]
         #inputToReservoir[:,1] = testSongsRhythm[s]
         echoesNewSong = collectEchoes( inputToReservoir )
@@ -287,7 +308,7 @@ for s in np.arange(len(test_data)):
         #pred=training_data[np.argmin(errors), ]
         #print(pred)
 
-        numberOfComposers = 36
+        
         predictionProbabilities = np.zeros( numberOfComposers )
         for echo in echoesNewSong:
                 predictionProbabilities =  predictionProbabilities + decisionTree.predict_proba(echo)
@@ -301,7 +322,7 @@ for s in np.arange(len(test_data)):
         
         outFile.write(composer+";" + ";" +";"+ ";"+"\n")
 
-#write it to outputfile
+        plt.show()
 
 
 
