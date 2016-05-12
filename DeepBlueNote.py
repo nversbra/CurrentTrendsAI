@@ -1,9 +1,9 @@
 from simple_esn import SimpleESN
 from sklearn.svm import SVR
 from sklearn.metrics import mean_squared_error
-from sklearn import tree
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import RidgeCV
+from sklearn.linear_model import LinearRegression
+from sklearn import preprocessing
 from itertools import groupby
 import matplotlib.pyplot as plt
 from array import array
@@ -11,13 +11,12 @@ import numpy as np
 import csv
 import random
 import sys
-
+import heapq
 
 
 
 
 ######################### Setup Part
-
 
 possibleDurationValues = [2, 3/2, 1, 3/4, 1/2, 3/8, 1/4, 3/16, 1/8, 3/32, 1/16, 3/64, 1/32, 3/128, 1/64]
 
@@ -26,10 +25,9 @@ def mapDuration(noteTime):
         compareArray = np.full(15, duration)
         duration_index = np.argmin(abs(possibleDurationValues - compareArray))
         return(possibleDurationValues[duration_index])
-        
+
 
 ### Process a CSV file
-# currently only with notes 
 def inputSong( filename ):
         songNotes = [] #starting with list to avoid storage move
         songRhytm = []
@@ -53,6 +51,7 @@ def inputSong( filename ):
                       songRhytm.append(mapDuration(noteTime) / 2 ) #scale the values to range 0 to 1
                 rownum += 1
         rhythm = np.asarray(songRhytm)
+        songNotes = np.asarray([t - s for s, t in zip(songNotes, songNotes[1:])])
         notes = np.asarray(songNotes)
         ifile.close()
         return [notes, rhythm];
@@ -62,14 +61,17 @@ def padWithZeros(song, neededSize):
         zeros = np.zeros(zerosNeeded)
         return np.append(song, zeros);
 
-print(sys.argv)
+
 training_data_file = sys.argv[1]
 test_data_file = sys.argv[2]
 output_file = sys.argv[3]
-n_components =sys.argv[4]
-damping =sys.argv[5]
-weight_scaling =sys.argv[6]
-
+n_components = int(sys.argv[4])
+damping = float(sys.argv[5])
+weight_scaling = float(sys.argv[6])
+n_readout = int(sys.argv[7])
+discard= int(sys.argv[8])
+alpha = float(sys.argv[9])
+lengthPenalty = float(sys.argv[10])
 
 def readDataFile(datafile):
     overviewFile  = open(datafile, "rt")
@@ -79,7 +81,6 @@ def readDataFile(datafile):
             songsOverviewList.append(row)
     del songsOverviewList[0] #remove header
     songsOverview = np.asarray(songsOverviewList)
-    #print("number of songs: " + str(songsOverview.shape[0]))
     return songsOverview
 
 
@@ -88,10 +89,11 @@ test_data = readDataFile(test_data_file)
 
 
 maxLengthOfSong = 1954 #longest song has 1954 notes
-trainSongsNotes = np.ndarray(shape=(training_data.shape[0], maxLengthOfSong), dtype=float, order='F')
-trainSongsRhythm = np.ndarray(shape=(training_data.shape[0], maxLengthOfSong), dtype=float, order='F')
-testSongsNotes = np.ndarray(shape=(test_data.shape[0], maxLengthOfSong), dtype=float, order='F')
-testSongsRhythm = np.ndarray(shape=(test_data.shape[0], maxLengthOfSong), dtype=float, order='F')
+
+trainSongsNotes = [] #using list to allow different song length
+testSongsNotes = [] #using list to allow different song length
+trainSongsRhythm = []
+testSongsRhythm = []
 
 
 index = 0;
@@ -99,9 +101,12 @@ index = 0;
 for songInfo in training_data:
         songId = songInfo[0]
         filename = "songs-csv/" + str(songId) + ".csv"
-        songNotesAndRhythm = inputSong(filename) 
-        trainSongsNotes[index] = padWithZeros(songNotesAndRhythm[0], maxLengthOfSong)
-        trainSongsRhythm[index] = padWithZeros(songNotesAndRhythm[1], maxLengthOfSong)
+        songNotesAndRhythm = inputSong(filename)
+        trainSongsNotes.append([])
+        trainSongsNotes[index] = songNotesAndRhythm[0]
+        #trainSongsNotes[index] = padWithZeros(songNotesAndRhythm[0], maxLengthOfSong)
+        trainSongsRhythm.append([])
+        trainSongsRhythm[index] = songNotesAndRhythm[1]
         songInfo[0] = int(index) #changes the indices in the overview to the 0-179 indices in the array of songs
         index = index + 1
 
@@ -109,57 +114,203 @@ index = 0;
 for songInfo in test_data:
     songId = songInfo[0]
     filename = "songs-csv/" + str(songId) + ".csv"
-    songNotesAndRhythm = inputSong(filename) 
-    testSongsNotes[index] = padWithZeros(songNotesAndRhythm[0], maxLengthOfSong)
-    testSongsRhythm[index] = padWithZeros(songNotesAndRhythm[1], maxLengthOfSong)
+    songNotesAndRhythm = inputSong(filename)
+    testSongsNotes.append([])
+    testSongsNotes[index] = songNotesAndRhythm[0]
+    testSongsRhythm.append([])
+    testSongsRhythm[index] = songNotesAndRhythm[1]
     songInfo[0] = int(index)  # changes the indices in the overview to the 0-179 indices in the array of songs
     index = index + 1
 
 # create 3D array where members of same class are grouped together, e.g. [ [ [..., 'art pepper', ..., ...], [..., 'art pepper', ..., ...] ], [ [..., 'benny carter', ..., ...], [..., 'benny carter', ..., ...] ] ]
 def groupBy(datasetOverview, className):
         if (className == "composer"):
-                return [list(g) for k, g in groupby(datasetOverview, lambda x:x[1])]
+                return [list(g) for k, g in groupby(datasetOverview[datasetOverview[:,1].argsort()], lambda x:x[1])]
         elif (className == "instrument"):
-                return [list(g) for k, g in groupby(datasetOverview, lambda x:x[3])]
+                return [list(g) for k, g in groupby(datasetOverview[datasetOverview[:,3].argsort()], lambda x:x[3])]
         elif (className == "style"):
-                return [list(g) for k, g in groupby(datasetOverview, lambda x:x[4])]
+                return [list(g) for k, g in groupby(datasetOverview[datasetOverview[:,4].argsort()], lambda x:x[4])]
         elif (className == "year"):
-                return [list(g) for k, g in groupby(datasetOverview, lambda x:x[5])]
+                return [list(g) for k, g in groupby(datasetOverview[datasetOverview[:,5].argsort()], lambda x:x[5])]
 
 
 
 ####################### Reservoir Part
 
 #fixed reservoir
-n_readout =  10
+#n_readout =  3
+#discard = 40
+#esn = SimpleESN(n_readout, n_components = 100, damping = 0.2, weight_scaling = 0.99, random_state = 1, discard_steps = discard)
 
-esn = SimpleESN(n_readout, n_components=int(n_components), damping = float(damping), weight_scaling = float(weight_scaling))
+esn = SimpleESN(n_readout, n_components=n_components, damping = damping, weight_scaling = weight_scaling, random_state = 1, discard_steps=discard)
 
-#### feed one or more songs to the reservoir and collect the echoes 
+#### feed one or more songs to the reservoir and collect the echoes
 
 def collectEchoes( inputToReservoir ):
-        #create 2D array with size n_samples (=length of song) * n_features (=number of songs)
-        #inputToReservoir = np.transpose(inputSongs)#np.ndarray(shape=(maxLengthOfSong,n_features), dtype=float, order='F')
         echoes = esn.fit_transform(inputToReservoir)
-        #print(echoes)
-        return echoes;
+        return preprocessing.scale(echoes);
 
 
 ####################### Learning Part
 
+
+possibleComposers = list(np.unique(training_data[:,1]))
+possibleInstruments = list(np.unique(training_data[:,3]))
+possibleStyles = list(np.unique(training_data[:,4]))
+possibleYears = list(np.unique(training_data[:,5]))
+
+
+
+
+##def predictSignalIteratively( echoes, originalSong, currentTimestep):
+##        svr = SVR(kernel='linear', C=1e3) #Support Vector Regression
+##        trainedSVR = svr.fit(echoes[0:currentTimestep, ], originalSong[0:currentTimestep])
+##        predictedValue = trainedSVR.predict(echoes[currentTimestep+1])
+##        return predictedValue;
+
+
 ### perform the regression of the echoes to the target signal and save the learner (i.e., the regression coefficients)
-def learnSignature( echoes, composerSignal ):
-        svr = SVR(kernel='rbf', C=1e3, gamma=0.1) #Support Vector Regression 
-        trainedSVR = svr.fit(echoes, composerSignal)
-        #print(trainedSVR.coef_)
-        return trainedSVR;
+def trainAtOnce( echoes, originalSong ):
+        svr = SVR(kernel='linear', C=1e3, epsilon = 0.08) #Support Vector Regression
+        trainedRegressor = svr.fit(echoes, originalSong[discard: ])
+        #ridge = RidgeCV(alphas=alpha)
+        #trainedRegressor = ridge.fit(echoes, originalSong[discard: ])
+ #       rgr = LinearRegression(fit_intercept=True, normalize = True)
+ #       trainedRegressor = rgr.fit(echoes, originalSong[discard: ])
+        learnedSignal = trainedRegressor.predict(echoes)
+        return(trainedRegressor, learnedSignal)
+
+def compareNewSong( echoesNewSong, trainedSVR, newSong ):
+        predictedSignal = trainedSVR.predict(echoesNewSong)
+        err = mean_squared_error(predictedSignal, newSong[discard: ])
+        return err;
+
+def categoryWithSmallestError( datasetGroupedByCategory, errorList):
+        meanErrors = []
+        for category in np.arange(len(datasetGroupedByCategory)):
+                meanError = 0
+                numberOfEntries = 0
+                for entry in datasetGroupedByCategory[category]:
+                        index = int(entry[0])
+                        meanError += errorList[index]
+                        numberOfEntries += 1
+                meanError = meanError / numberOfEntries
+                meanErrors.append(meanError)
+        return np.argmin(meanErrors);
+
+
+def classify(trainingData, errors):
+        pred = []
+        for s in np.arange(len(trainingData)):
+                trainingData[s, 0] = s #replace the index to the correct csv file with the index of the entry in the trainingset
+        composersGrouped = groupBy(trainingData, "composer")
+        instrumentsGrouped = groupBy(trainingData, "instrument")
+        stylesGrouped = groupBy(trainingData, "style")
+        yearsGrouped = groupBy(trainingData, "year")
+
+        pred.append( possibleComposers[ categoryWithSmallestError(composersGrouped, errors)] )
+        pred.append(possibleInstruments[ categoryWithSmallestError(instrumentsGrouped, errors)])
+        pred.append(possibleStyles[ categoryWithSmallestError(stylesGrouped, errors)] )
+        pred.append(possibleYears[ categoryWithSmallestError(yearsGrouped, errors)] )
+        return pred;
+
+
+
+
+SVRs = []
+learnedSignals = [] #becomes 2D list
+
+possibleComposers = list(np.unique(training_data[:,1]))
+numberOfComposers = 37
+colorList = plt.cm.Dark2(np.linspace(0, 1, numberOfComposers))
+
+
+for s in np.arange(len(training_data)):
+        print(s)
+        trainSong = trainSongsNotes[s]
+        #trainSongRhythm = trainSongsRhythm[s]
+        inputToReservoir = np.ndarray(shape=(len(trainSong),1), dtype=float, order='F')
+        inputToReservoir[:,0] = trainSong
+ #       inputToReservoir[:,1] = trainSongRhythm
+        echoes = collectEchoes( inputToReservoir )
+        training = trainAtOnce(echoes, trainSong)
+        SVRs.append(training[0])
+        #print(training[0].coef_)
+        learnedSignals.append([])
+        learnedSignals[s] = training[1]
+
+        if (s < 1):
+                target = training_data[s, 1]
+                targetAsInteger = possibleComposers.index(target)
+                xAxis = np.arange(len(trainSong)-discard)
+                #print(training[1].shape)
+                #print(len(xAxis))
+                plt.plot(xAxis, trainSong[discard : ], color = colorList[targetAsInteger+6] )
+                plt.plot(xAxis, training[1], color = colorList[targetAsInteger] )
+                #plt.plot(xAxis, echoes, color = colorList[targetAsInteger] )
+
+#plt.show()
+
+
+
+outFile = open(output_file, 'w')
+for s in np.arange(len(test_data)):
+#for s in np.arange(10):
+        print("****")
+        print(s)
+        testSong = testSongsNotes[s]
+ #       testSongRhythm = testSongsRhythm[s]
+        inputToReservoir = np.ndarray(shape=(len(testSong),1), dtype=float, order='F')
+        inputToReservoir[:,0] = testSong
+ #       inputToReservoir[:,1] = testSongRhythm
+        echoesNewSong = collectEchoes( inputToReservoir )
+
+        errors = []
+        if (s == 0):
+                xAxis = np.arange(len(testSong)-discard)
+                plt.plot(xAxis, testSong[discard : ], color = 'k')
+        for i in np.arange(len(training_data)):
+                err = compareNewSong( echoesNewSong, SVRs[i], testSong)
+                err += abs(len(testSong) - len(trainSongsNotes[s])) / maxLengthOfSong * lengthPenalty;
+                #print(err)
+                errors.append(err)
+                if (s == 0 and 0 < i < 20):
+                        composer = training_data[i, 1]
+                        composerAsInteger = possibleComposers.index(composer)
+                        plt.plot(xAxis, SVRs[i].predict(echoesNewSong), color = colorList[composerAsInteger] )
+
+        indicesOf5best = heapq.nsmallest(5, range(len(errors)), errors.__getitem__)
+        print(indicesOf5best)
+        #prediction = classify(training_data, errors)
+        prediction = training_data[np.argmin(errors)]
+        print(prediction)
+        outFile.write(prediction[1]+";" + prediction[3] + ";" + prediction[4] + ";" + prediction[5]+ ";"+ prediction[6] + "\n")
+##        print(training_data[indicesOf5best[0], :])
+##        print(training_data[indicesOf5best[1], :])
+##        print(training_data[indicesOf5best[2], :])
+##        print(training_data[indicesOf5best[3], :])
+##        print(training_data[indicesOf5best[4], :])
+
+#plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 ####################### Classification Part
 
 ### use the trained SVR (=signature) belonging to a certain composer/style/... to predict a signal from the echoes resulting from a new song
-### compare this signal to the true signal for that composer/style/... and return the error 
+### compare this signal to the true signal for that composer/style/... and return the error
 def dissimilarity( echoesOfNewSong, trainedSVR, trueSignal):
         predictedSignal = trainedSVR.predict(echoesOfNewSong)
         err = mean_squared_error(trueSignal, predictedSignal)
@@ -168,195 +319,25 @@ def dissimilarity( echoesOfNewSong, trainedSVR, trueSignal):
 
 classIndices = [1, 3, 4, 5] # index of columns in overview file corresponding to different classes
 
-##def predict(testSet):
-##        fieldnames = ['id','Performer','Inst','Style','Year','Key']
-##        outputFile = open('output-file.csv', 'w')
-##        writer = csv.DictWriter(outputFile, fieldnames=fieldnames,  delimiter=";")
-##        writer.writeheader()
-##
-##        possibleTargets = list() #list of possible targets (values to be predicted) per class
-##        for i in np.arange(4):
-##                possibleTargets.append([])
-##                classIndex = classIndices[i]
-##                possibleTargets[i] = np.unique(testSet[:,classIndex])
-##
-##        for s in np.arange(len(testSet)):
-##                predictions = []
-##                for c in possibleTargets:
-##                        predictions.append(random.choice(c))
-##                id = testSet[:,0][s]
-##                writer.writerow({'id': id ,'Performer': predictions[0] ,'Inst': predictions[1],'Style': predictions[2],'Year': predictions[3],'Key' : "major"})
-
- 
-           
-                
-                        
-        
-        
-
-##all_indices = np.arange(180)
-##test_indices = all_indices[::5]
-##train_indices = np.delete(all_indices, test_indices)
-
-#test = songsOverview[test_indices]
-#train = songsOverview[train_indices]
-
-#trainedSVRs = []
-
-allEchoes = np.ndarray(shape=(len(training_data),maxLengthOfSong,n_readout), dtype=float, order='F')
-
-echoSet = np.ndarray(shape=(len(training_data) * maxLengthOfSong, n_readout), dtype=float, order='F')
-targets = []
-possibleTargets = np.unique(training_data[:,1])
-
-
-print("training phase...")
-
-
-indexInEchoSet = 0
-
-indicesShuffled = list(range(len(training_data)))
-random.shuffle(indicesShuffled)
-
-for s in np.arange(len(training_data)):
-        print(s)
-        index = indicesShuffled[s]
-        #if(s % 4 == 0):
-                #indexOfComposer += 1
-        #inputIndex = int(training_data[index, 0])
-        inputToReservoir = np.ndarray(shape=(maxLengthOfSong,1), dtype=float, order='F') 
-        inputToReservoir[:,0] = trainSongsNotes[index]
-        #inputToReservoir[:,1] = trainSongsRhythm[s]
-        #echoes = collectEchoes( np.array(trainsongs[index], ndmin=2) )
-        echoes = collectEchoes( inputToReservoir )
-        target = training_data[index, 1]
-        for echo in echoes:
-                echoSet[indexInEchoSet, ] = echo
-                targets.append(target)
-                indexInEchoSet += 1
-        
-        #print(echoes.shape)
-        #print(echoes.shape)
-        #print(songs[index].shape)
-        #trainedSVRs.append(learnSignature( echoes, trainSongsNotes[index] ))
-        #allEchoes[s] = echoes
-        #print(allEchoes.shape)
-
-
-
-
-targets = np.asarray(targets)
-##targetsAsIntegersShuffled =  np.take(targetsAsIntegers, indices)
-##
-##echoSetShuffled = np.take(echoSet, indices, axis = 
-##
-##print(echoSet.shape)
-##print(targetsAsIntegersShuffled.shape)
-
-
-
-#decisionTree = tree.DecisionTreeClassifier(min_samples_leaf=1000)
-#decisionTree = decisionTree.fit(echoSet, targets)
-rf = RandomForestClassifier(max_depth=5, n_estimators=10, max_features=1)
-decisionTree = rf.fit(echoSet, targets)
-print(decisionTree.score(echoSet, targets))
 
 
 
 
 
 
-print("predicting phase...")
-        
-outFile = open(output_file, 'w')
-for s in np.arange(len(test_data)):
-        print(s)
-        index = int(test_data[s, 0])
-        inputToReservoir = np.ndarray(shape=(maxLengthOfSong,1), dtype=float, order='F') 
-        inputToReservoir[:,0] = testSongsNotes[s]
-        #inputToReservoir[:,1] = testSongsRhythm[s]
-        echoesNewSong = collectEchoes( inputToReservoir )
-        #print(echoes.shape)
-        #errors = []
-        #for i in np.arange(len(training_data)):
-                #errors.append(dissimilarity( echoesNewSong, trainedSVRs[i], trainSongsNotes[i] ))
-                #print((allEchoes[i])[:,0].shape)
-                       
-                #echoesNew = np.ndarray(shape=(maxLengthOfSong,1), dtype=float, order='F')
-                #echoesNew[:,0] = echoesNewSong[:,0]
-                #print(echoesNew.shape)
-                #print(np.asarray(allEchoes[i][:,0]).shape)
-                
-                #trainedSVR = learnSignature(echoesNewSong, allEchoes[i][:,0])
-                #errors.append(dissimilarity( echoesNewSong, trainedSVR, (allEchoes[i])[:,0] ))
-        #print( np.argmin(errors) )
-        #pred=training_data[np.argmin(errors), ]
-        #print(pred)
-
-        numberOfComposers = 36
-        predictionProbabilities = np.zeros( numberOfComposers )
-        for echo in echoesNewSong:
-                predictionProbabilities =  predictionProbabilities + decisionTree.predict_proba(echo)
-
-        #print([x / maxLengthOfSong for x in predictionProbabilities])
-        composerIndex = np.argmax(predictionProbabilities)
-        print(composerIndex)
-        print("-----")
-        composer = possibleTargets[composerIndex]
-                
-        
-        outFile.write(composer+";" + ";" +";"+ ";"+"\n")
-
-#write it to outputfile
-
-
-
-        
-        
-              
-                
-                
-                
-                
-
-
-##targetsGroupedByComposer = groupBy(train, "composer")
-##xAxis = np.arange(maxLengthOfSong)
-##
-##
-##colorIndex = 0
-##
-##colorList = plt.cm.Dark2(np.linspace(0, 1, 10))
-##
-##predict(test)
-
-##for composer in targetsGroupedByComposer:
-##        #print("**************") 
-##        #print(colorIndex)
-##        for songMetaData in composer:
-##                i = int(songMetaData[0])
-##                if (i < 36) :
-##                        color = colorList[colorIndex]
-##                        echoes = collectEchoes( np.array(songs[i], ndmin=2) )
-##                        plt.plot(xAxis, echoes.flatten(), c=color, label=songMetaData[1])
-##        colorIndex = colorIndex + 1
-##
-##plt.show()
 
 
 
 
 
 
-#svr_rbf = SVR(kernel='rbf', C=1e3, gamma=0.1)
-#y_rbf = svr_rbf.fit(echoes, composerSignal).predict(echoes)
 
-#xAxis = np.arange(echoes.shape[0])
 
-#plt.plot(xAxis, composerSignal, c='k', label='composersignal')
-#plt.scatter(xAxis, echoes.flatten(), c='g', label='echoes')
-#plt.plot(xAxis, y_rbf, c='y', label='regression')
-#plt.legend()
+
+
+
+
+
 
 
 

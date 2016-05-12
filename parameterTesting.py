@@ -19,7 +19,7 @@ test.close()
 for row in reader:
     print row
     command = 'Python DeepBlueNote.py training-data-file-0.csv test-data-file-0.csv output-file.csv ' + row[0] + ' ' + \
-              row[1] + ' ' + row[2]
+              row[1] + ' ' + row[2] + ' ' + row[3] + ' ' + row[4] + ' ' + row[5] + ' ' + row[6]
     os.system(command)
 
     pred = open('output-file.csv', 'rb')
