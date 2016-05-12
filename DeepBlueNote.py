@@ -23,10 +23,10 @@ n_components = int(sys.argv[4])
 damping = float(sys.argv[5])
 weight_scaling = float(sys.argv[6])
 n_readout = int(sys.argv[7])
-discard= int(sys.argv[8])
+discard = int(sys.argv[8])
 alpha = float(sys.argv[9])
 lengthPenalty = float(sys.argv[10])
-
+random_seed = int(sys.argv[11])
 
 training_data = Utils.readDataFile(training_data_file)
 test_data = Utils.readDataFile(test_data_file)
@@ -44,7 +44,7 @@ testSongsRhythm = testData[1]
 #discard = 40
 #esn = SimpleESN(n_readout, n_components = 100, damping = 0.2, weight_scaling = 0.99, random_state = 1, discard_steps = discard)
 
-esn = SimpleESN(n_readout, n_components=n_components, damping = damping, weight_scaling = weight_scaling, random_state = 1, discard_steps=discard)
+esn = SimpleESN(n_readout, n_components=n_components, damping = damping, weight_scaling = weight_scaling, random_state = random_seed, discard_steps=discard)
 
 #### feed one or more songs to the reservoir and collect the echoes
 
@@ -138,17 +138,6 @@ for s in np.arange(len(test_data)):
 ##        print(training_data[indicesOf5best[4], :])
 
 #plt.show()
-
-
-
-
-
-
-
-
-
-
-
 
 
 
