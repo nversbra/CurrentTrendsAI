@@ -18,6 +18,7 @@ import sys
 
 ######################### Setup Part
 
+
 possibleDurationValues = [2, 3/2, 1, 3/4, 1/2, 3/8, 1/4, 3/16, 1/8, 3/32, 1/16, 3/64, 1/32, 3/128, 1/64]
 
 def mapDuration(noteTime):
@@ -61,10 +62,14 @@ def padWithZeros(song, neededSize):
         zeros = np.zeros(zerosNeeded)
         return np.append(song, zeros);
 
-
+print(sys.argv)
 training_data_file = sys.argv[1]
 test_data_file = sys.argv[2]
 output_file = sys.argv[3]
+n_components =sys.argv[4]
+damping =sys.argv[5]
+weight_scaling =sys.argv[6]
+
 
 def readDataFile(datafile):
     overviewFile  = open(datafile, "rt")
@@ -127,7 +132,8 @@ def groupBy(datasetOverview, className):
 
 #fixed reservoir
 n_readout =  10
-esn = SimpleESN(n_readout, damping = 0.9, weight_scaling = 0.9)
+
+esn = SimpleESN(n_readout, n_components=int(n_components), damping = float(damping), weight_scaling = float(weight_scaling))
 
 #### feed one or more songs to the reservoir and collect the echoes 
 
