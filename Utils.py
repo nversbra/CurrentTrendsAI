@@ -88,6 +88,7 @@ def importTrainingData(training_data):
         songInfo[0] = int(index) #changes the indices in the overview to the 0-179 indices in the array of songs
         index = index + 1
     return  [trainSongsNotes, trainSongsRhythm]
+
 def importTestData(test_data):
     index = 0;
     testSongsNotes = []  # using list to allow different song length

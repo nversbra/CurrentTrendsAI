@@ -5,6 +5,7 @@
 
 *.ipynb
 
+*.pyc
 
 ATAI/*
 
@@ -18,5 +19,9 @@ DeepBlueNote.spec
 
 dist/DeepBlueNote/
 
+
+
+
+parameters/*
 
 

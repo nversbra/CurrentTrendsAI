@@ -20,7 +20,7 @@ int main(int argc, const char * argv[]) {
     loc=loc.substr(0,loc.find("DeepBlueNote"));
     std::cout << buffer << "\n";
     std::cout << loc << "\n";
-    std::string command = "cd "+loc+" \nPython DeepBlueNote.py "+train+" "+test+" "+out;
+    std::string command = "cd "+loc+" \nPython DeepBlueNote.py "+train+" "+test+" "+out+" 97" +" 0.991127084577083" + " 0.6889224750972345" +" 7"+" 19"+" 0.05276771837066035"+" 0.005052682628063044" +" 29001";
     std::cout << command << "\n";
     std::system(command.c_str());
     return 0;
