@@ -19,15 +19,24 @@ import Classify
 training_data_file = sys.argv[1]
 test_data_file = sys.argv[2]
 output_file = sys.argv[3]
-n_components = int(sys.argv[4])
-damping = float(sys.argv[5])
-weight_scaling = float(sys.argv[6])
-n_readout = int(sys.argv[7])
-discard = int(sys.argv[8])
-alpha = float(sys.argv[9])
-lengthPenalty = float(sys.argv[10])
-random_seed = int(sys.argv[11])
-
+if len(sys.argv) > 5:
+        n_components = int(sys.argv[4])
+        damping = float(sys.argv[5])
+        weight_scaling = float(sys.argv[6])
+        n_readout = int(sys.argv[7])
+        discard = int(sys.argv[8])
+        alpha = float(sys.argv[9])
+        lengthPenalty = float(sys.argv[10])
+        random_seed = int(sys.argv[11])
+else:
+        n_components = 97
+        damping = float(0.991127084577083)
+        weight_scaling = float(0.6889224750972345)
+        n_readout = 7
+        discard = 19
+        alpha = float(0.05276771837066035)
+        lengthPenalty = float(0.005052682628063044)
+        random_seed = int(29001)
 training_data = Utils.readDataFile(training_data_file)
 test_data = Utils.readDataFile(test_data_file)
 trainData=Utils.importTrainingData(training_data)
