@@ -21,12 +21,12 @@ iterArray = np.arange(0, 1001, 1)
 for i in iterArray:
 
     n_components.append(random.randrange(100, 150, 1))
-    damping.append(random.uniform(0.1, 0.3))
-    weight_scaling.append(random.uniform(0.01, 0.1))
+    damping.append(random.uniform(0.2, 0.5))
+    weight_scaling.append(random.uniform(0.03, 0.07))
     n_readouts.append(random.randrange(6, 12, 1))
     discard_steps.append(random.randrange(10, 15, 1))
-    alpha.append(random.uniform(0.07, 0.15))
-    lengthPenalty.append(random.uniform(0.05, 0.15))
+    alpha.append(random.uniform(0.1, 0.3))
+    lengthPenalty.append(random.uniform(0.1, 0.15))
     random_seed.append(random.randrange(30000, 50000, 5))
 
 iterArray = np.arange(0, 1000, 1)

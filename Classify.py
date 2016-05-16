@@ -1,7 +1,9 @@
 import numpy as np
 from sklearn import preprocessing
+from sklearn.linear_model import RidgeCV
 from sklearn.metrics import mean_squared_error
 from sklearn.svm import SVR
+from sklearn import tree
 
 import Utils
 
@@ -20,15 +22,27 @@ def collectEchoes(esn, inputToReservoir):
 
 
 ### perform the regression of the echoes to the target signal and save the learner (i.e., the regression coefficients)
-def trainAtOnce( echoes, originalSong, discard):
-        svr = SVR(kernel='linear', C=1e3, epsilon = 0.08) #Support Vector Regression
+def trainAtOnce( echoes, originalSong, discard, alpha):
+        svr = SVR(kernel='linear', C=1e3, epsilon = alpha) #Support Vector Regression
         trainedRegressor = svr.fit(echoes, originalSong[discard: ])
+        #regTree = tree.DecisionTreeRegressor(max_depth=2)
+        #trainedRegressor = regTree.fit(echoes, originalSong[discard:])
         #ridge = RidgeCV(alphas=alpha)
         #trainedRegressor = ridge.fit(echoes, originalSong[discard: ])
  #       rgr = LinearRegression(fit_intercept=True, normalize = True)
  #       trainedRegressor = rgr.fit(echoes, originalSong[discard: ])
         learnedSignal = trainedRegressor.predict(echoes)
         return(trainedRegressor, learnedSignal)
+
+def extremaMetric(trainingSignals, testSignal):
+        err = 0
+        for i in len(testSignal):
+                t= testSignal[i]
+                a=[]
+                for train in trainingSignals:
+                        print train
+
+
 
 def compareNewSong( echoesNewSong, trainedSVR, newSong, discard ):
         predictedSignal = trainedSVR.predict(echoesNewSong)

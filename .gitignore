@@ -25,3 +25,8 @@ dist/DeepBlueNote/
 parameters/*
 
 
+
+crossvalidate.pl
+
+
+*.csv
