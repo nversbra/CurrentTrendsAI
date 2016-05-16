@@ -22,6 +22,16 @@ dist/DeepBlueNote/
 
 
 
-parameters/*
 
 
+
+
+run 900something.csv
+
+parameters 100 run.csv
+
+parameter tuning 1000 run.csv
+
+parameter tuning instrument 1000.csv
+
+refining run.csv
