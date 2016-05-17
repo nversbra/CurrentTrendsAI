@@ -40,7 +40,7 @@ def extremaMetric(trainingSignals, testSignal):
                 t= testSignal[i]
                 a=[]
                 for train in trainingSignals:
-                        print train
+                        print(train)
 
 
 
