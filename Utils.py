@@ -35,7 +35,7 @@ def inputSong( filename ):
                     if (rownum % 2 == 0):
                       songNotes.append(float(row[column_of_notes].strip())/maxMidiNote) #scale the values to range 0 to 1
                       noteTime = int(row[column_of_rhythm])-int(noteOnTime)
-                      songRhytm.append(mapDuration(noteTime) / 2 ) #scale the values to range 0 to 1
+                      songRhytm.append(mapDuration(noteTime) )
                 rownum += 1
         rhythm = np.asarray(songRhytm)
         songNotes = np.asarray([t - s for s, t in zip(songNotes, songNotes[1:])])

@@ -10,7 +10,8 @@ import Utils
 
 def collectEchoes(esn, inputToReservoir):
     echoes = esn.fit_transform(inputToReservoir)
-    return preprocessing.scale(echoes);
+    #return preprocessing.scale(echoes);
+    return echoes;
 
 
 
@@ -27,8 +28,9 @@ def trainAtOnce( echoes, originalSong, discard, alpha):
         trainedRegressor = svr.fit(echoes, originalSong[discard: ])
         #regTree = tree.DecisionTreeRegressor(max_depth=2)
         #trainedRegressor = regTree.fit(echoes, originalSong[discard:])
-        #ridge = RidgeCV(alphas=alpha)
-        #trainedRegressor = ridge.fit(echoes, originalSong[discard: ])
+#        ridge = RidgeCV(alphas=[alpha])
+ #      trainedRegressor = ridge.fit(echoes, originalSong[discard: ])
+        #print(trainedRegressor.coef_)
  #       rgr = LinearRegression(fit_intercept=True, normalize = True)
  #       trainedRegressor = rgr.fit(echoes, originalSong[discard: ])
         learnedSignal = trainedRegressor.predict(echoes)
@@ -45,6 +47,7 @@ def extremaMetric(trainingSignals, testSignal):
 
 
 def compareNewSong( echoesNewSong, trainedSVR, newSong, discard ):
+        max_abs_scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))
         predictedSignal = trainedSVR.predict(echoesNewSong)
         err = mean_squared_error(predictedSignal, newSong[discard: ])
         return err;

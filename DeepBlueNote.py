@@ -16,17 +16,27 @@ import Utils
 import Classify
 
 
+
 training_data_file = sys.argv[1]
 test_data_file = sys.argv[2]
 output_file = sys.argv[3]
-n_components = int(sys.argv[4])
-damping = float(sys.argv[5])
-weight_scaling = float(sys.argv[6])
-n_readout = int(sys.argv[7])
-discard = int(sys.argv[8])
-alpha = float(sys.argv[9])
-lengthPenalty = float(sys.argv[10])
-random_seed = int(sys.argv[11])
+##n_components = int(sys.argv[4])
+##damping = float(sys.argv[5])
+##weight_scaling = float(sys.argv[6])
+##n_readout = int(sys.argv[7])
+##discard = int(sys.argv[8])
+##alpha = float(sys.argv[9])
+##lengthPenalty = float(sys.argv[10])
+##random_seed = int(sys.argv[11])
+
+n_components = 185
+damping = 0.3
+weight_scaling = 1
+n_readout = 4
+discard = 12
+alpha = 0.6023261048700658
+lengthPenalty = 0.059958280678965095
+random_seed = 38265
 
 training_data = Utils.readDataFile(training_data_file)
 test_data = Utils.readDataFile(test_data_file)
@@ -72,28 +82,48 @@ colorList = plt.cm.Dark2(np.linspace(0, 1, numberOfComposers))
 
 
 for s in np.arange(len(training_data)):
-        #print(s)
-        trainSong = trainSongsNotes[s]
-        #trainSongRhythm = trainSongsRhythm[s]
+#for s in np.arange(10):
+        print(s)
+#        trainSong = preprocessing.scale(trainSongsNotes[s])
+        max_abs_scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))
+        trainSong = preprocessing.scale(trainSongsRhythm[s])
         inputToReservoir = np.ndarray(shape=(len(trainSong),1), dtype=float, order='F')
         inputToReservoir[:,0] = trainSong
- #       inputToReservoir[:,1] = trainSongRhythm
-        echoes = Classify.collectEchoes(esn, inputToReservoir)
+ #       echoes = max_abs_scaler.fit_transform(preprocessing.scale(Classify.collectEchoes(esn, inputToReservoir)))
+        max_abs_scaler01 = preprocessing.MinMaxScaler(feature_range=(0, 1))
+        echoes = np.abs(preprocessing.scale(Classify.collectEchoes(esn, inputToReservoir)))
+        print(echoes.shape)
         training = Classify.trainAtOnce(echoes, trainSong, discard, alpha)
         SVRs.append(training[0])
         #print(training[0].coef_)
         learnedSignals.append([])
         learnedSignals[s] = training[1]
 
-        if (s < 0):
+        
+
+        if (s == 0):
+                plt.figure()
                 target = training_data[s, 1]
                 targetAsInteger = possibleComposers.index(target)
                 xAxis = np.arange(len(trainSong)-discard)
-                #print(training[1].shape)
-                #print(len(xAxis))
-                #plt.plot(xAxis, trainSong[discard : ], color = colorList[targetAsInteger+6] )
-                #plt.plot(xAxis, training[1], color = colorList[targetAsInteger] )
-                #plt.plot(xAxis, echoes, color = colorList[targetAsInteger] )
+ #               plt.plot(xAxis, trainSong[discard : ], color = colorList[targetAsInteger + 10 ] )
+#                plt.plot(xAxis, training[1], color = colorList[targetAsInteger] )
+                plt.plot(xAxis, training[1], color = 'r' )
+                plt.plot(xAxis, trainSong[discard : ], color = 'k')
+                for e in np.arange(n_readout):
+                        plt.plot(xAxis, echoes[:,e], color = colorList[e] )
+                        
+                        
+        if (s == 5):
+                plt.figure()
+                target = training_data[s, 1]
+                targetAsInteger = possibleComposers.index(target)
+                xAxis = np.arange(len(trainSong)-discard)
+#                plt.plot(xAxis, trainSong[discard : ], color = colorList[targetAsInteger + 10 ] )
+                plt.plot(xAxis, training[1], color = 'r' )
+                plt.plot(xAxis, trainSong[discard : ], color = 'k')
+                for e in np.arange(n_readout):
+                        plt.plot(xAxis, echoes[:,e], color = colorList[e] )
 
 #plt.show()
 
@@ -104,58 +134,49 @@ for s in np.arange(len(test_data)):
 #for s in np.arange(10):
         #print("****")
         #print(s)
-        testSong = testSongsNotes[s]
- #       testSongRhythm = testSongsRhythm[s]
+#        testSong = preprocessing.scale(testSongsNotes[s])
+ #       testSong = preprocessing.scale(testSongsRhythm[s])
+        max_abs_scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))
+        testSong = preprocessing.scale(testSongsRhythm[s])
         inputToReservoir = np.ndarray(shape=(len(testSong),1), dtype=float, order='F')
         inputToReservoir[:,0] = testSong
- #       inputToReservoir[:,1] = testSongRhythm
-        echoesNewSong = Classify.collectEchoes(esn, inputToReservoir )
+        max_abs_scaler01 = preprocessing.MinMaxScaler(feature_range=(0, 1))
+        echoesNewSong = np.abs(preprocessing.scale(Classify.collectEchoes(esn, inputToReservoir )))
 
         errors = []
-        if (s < 0):
+        if (s == 0):
                 xAxis = np.arange(len(testSong)-discard)
         for i in np.arange(len(training_data)):
-                #plt.figure()
-                #xAxis = np.arange(len(testSong) - discard)
-                #plt.plot(xAxis, testSong[discard:], color='k')
+        #for i in np.arange(10):
                 err = Classify.compareNewSong(echoesNewSong, SVRs[i], testSong, discard)
                 err += abs(len(testSong) - len(trainSongsNotes[s])) / Utils.maxLengthOfSong * lengthPenalty;
                 #print(err)
                 errors.append(err)
-                #if ( 0 <= i ):
-                 #       composer = training_data[i, 1]
-                  #      composerAsInteger = possibleComposers.index(composer)
-                        #plt.plot(xAxis, np.gradient(SVRs[i].predict(echoesNewSong)), color = 'r' )
-                        #plt.show()
+                if ( s == 0 and (i==0 or i==5)):
+                      composer = training_data[i, 1]
+                      composerAsInteger = possibleComposers.index(composer)
+                      plt.plot(xAxis, testSong[discard:], color='k')
+                      plt.plot(xAxis, max_abs_scaler.fit_transform(preprocessing.scale(SVRs[i].predict(echoesNewSong))), color = 'r' )
+                      for e in np.arange(n_readout):
+                               plt.plot(xAxis, echoesNewSong[:,e], color = colorList[e] )
+                        
                    #     if i>0:
                     #            plt.close(i-1)
                         #print composer
-
+        
         indicesOf5best = heapq.nsmallest(5, range(len(errors)), errors.__getitem__)
-        print(indicesOf5best)
+#        print(indicesOf5best)
         #prediction = classify(training_data, errors)
         prediction = training_data[np.argmin(errors)]
-        print(prediction)
+#        print(prediction)
         outFile.write(prediction[1]+";" + prediction[3] + ";" + prediction[4] + ";" + prediction[5]+ ";"+ prediction[6] + "\n")
 ##        print(training_data[indicesOf5best[0], :])
 ##        print(training_data[indicesOf5best[1], :])
 ##        print(training_data[indicesOf5best[2], :])
 ##        print(training_data[indicesOf5best[3], :])
 ##        print(training_data[indicesOf5best[4], :])
+#plt.show()
 
 
 
 
-
-
-####################### Classification Part
-
-### use the trained SVR (=signature) belonging to a certain composer/style/... to predict a signal from the echoes resulting from a new song
-### compare this signal to the true signal for that composer/style/... and return the error
-def dissimilarity( echoesOfNewSong, trainedSVR, trueSignal):
-        predictedSignal = trainedSVR.predict(echoesOfNewSong)
-        err = mean_squared_error(trueSignal, predictedSignal)
-        return err;
-
-
-classIndices = [1, 3, 4, 5] # index of columns in overview file corresponding to different classes
