@@ -35,3 +35,7 @@ parameter tuning 1000 run.csv
 parameter tuning instrument 1000.csv
 
 refining run.csv
+
+crossvalidate.pl
+
+python_speech_features/

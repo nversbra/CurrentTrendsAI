@@ -8,13 +8,16 @@ from itertools import groupby
 import matplotlib.pyplot as plt
 from array import array
 import numpy as np
+import os
 import csv
 import random
 import sys
 import heapq
 import Utils
 import Classify
-
+import scipy.io.wavfile
+from features import mfcc
+from features import logfbank
 
 training_data_file = sys.argv[1]
 test_data_file = sys.argv[2]
@@ -83,18 +86,27 @@ colorList = plt.cm.Dark2(np.linspace(0, 1, numberOfComposers))
 for s in np.arange(len(training_data)):
         print(s)
         trainSong = trainSongsNotes[s]
+        a=[]
+
+        name = str(s)
+        name += '.wav'
+        scipy.io.wavfile.write(name, 60,trainSong)
+        (rate, sig) = scipy.io.wavfile.read(name)
+        mfcc_feat = mfcc(sig, rate)
+        os.remove(name)
         #trainSongRhythm = trainSongsRhythm[s]
-        inputToReservoir = np.ndarray(shape=(len(trainSong),1), dtype=float, order='F')
-        inputToReservoir[:,0] = trainSong
- #       inputToReservoir[:,1] = trainSongRhythm
-        echoes = Classify.collectEchoes(esn, inputToReservoir)
-        training = Classify.trainAtOnce(echoes, trainSong, discard)
+        #inputToReservoir = np.ndarray(shape=(len(trainSong),1), dtype=float, order='F')
+        #inputToReservoir[:,0] = trainSong
+        #inputToReservoir[:,1] = trainSongRhythm
+        echoes = Classify.collectEchoes(esn, mfcc_feat)
+
+        training = Classify.trainAtOnce(echoes, trainSong, discard+1)
         SVRs.append(training[0])
         #print(training[0].coef_)
         learnedSignals.append([])
         learnedSignals[s] = training[1]
 
-        if (s < 1):
+        if (s < 0):
                 target = training_data[s, 1]
                 targetAsInteger = possibleComposers.index(target)
                 xAxis = np.arange(len(trainSong)-discard)
@@ -115,21 +127,28 @@ for s in np.arange(len(test_data)):
         print(s)
         testSong = testSongsNotes[s]
  #       testSongRhythm = testSongsRhythm[s]
-        inputToReservoir = np.ndarray(shape=(len(testSong),1), dtype=float, order='F')
-        inputToReservoir[:,0] = testSong
+        name = str(s)
+        name += '.wav'
+        scipy.io.wavfile.write(name, 60, testSong)
+        (rate, sig) = scipy.io.wavfile.read(name)
+        mfcc_feat = mfcc(sig, rate)
+        os.remove(name)
+
+        #inputToReservoir = np.ndarray(shape=(len(testSong),1), dtype=float, order='F')
+        #inputToReservoir[:,0] = testSong
  #       inputToReservoir[:,1] = testSongRhythm
-        echoesNewSong = Classify.collectEchoes(esn, inputToReservoir )
+        echoesNewSong = Classify.collectEchoes(esn, mfcc_feat )
 
         errors = []
         if (s == 0):
                 xAxis = np.arange(len(testSong)-discard)
                 plt.plot(xAxis, testSong[discard : ], color = 'k')
         for i in np.arange(len(training_data)):
-                err = Classify.compareNewSong(echoesNewSong, SVRs[i], testSong, discard)
+                err = Classify.compareNewSong(echoesNewSong, SVRs[i], testSong, discard+1)
                 err += abs(len(testSong) - len(trainSongsNotes[s])) / Utils.maxLengthOfSong * lengthPenalty;
                 #print(err)
                 errors.append(err)
-                if (s == 0 and 0 < i < 20):
+                if (s == 0 and 0 < i < 0):
                         composer = training_data[i, 1]
                         composerAsInteger = possibleComposers.index(composer)
                         plt.plot(xAxis, SVRs[i].predict(echoesNewSong), color = colorList[composerAsInteger] )
