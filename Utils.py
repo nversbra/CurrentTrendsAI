@@ -18,6 +18,7 @@ def mapDuration(noteTime):
 def inputSong( filename ):
         songNotes = [] #starting with list to avoid storage move
         songRhytm = []
+        songMelodic = []
         headerBegin = 0
         headerEnd = 6
         column_of_notes = 4
@@ -33,15 +34,19 @@ def inputSong( filename ):
                     if (rownum % 2 == 1):
                         noteOnTime=int (row[column_of_rhythm])
                     if (rownum % 2 == 0):
-                      songNotes.append(float(row[column_of_notes].strip())/maxMidiNote) #scale the values to range 0 to 1
+                      pitch = float(row[column_of_notes].strip())
+                      songNotes.append(pitch/maxMidiNote) 
                       noteTime = int(row[column_of_rhythm])-int(noteOnTime)
                       songRhytm.append(mapDuration(noteTime) )
+                      melodic = [pitch] * noteTime
+                      songMelodic = songMelodic + melodic
                 rownum += 1
         rhythm = np.asarray(songRhytm)
         songNotes = np.asarray([t - s for s, t in zip(songNotes, songNotes[1:])])
         notes = np.asarray(songNotes)
+        melodic = np.asarray(songMelodic)
         ifile.close()
-        return [notes, rhythm];
+        return [notes, rhythm, melodic];
 
 def padWithZeros(song, neededSize):
         zerosNeeded = neededSize - song.shape[0]
@@ -67,32 +72,30 @@ maxLengthOfSong = 1954 #longest song has 1954 notes
 
 
 
-
-
-
-
-
 def importTrainingData(training_data):
     index = 0;
     trainSongsNotes = []
     trainSongsRhythm = []
+    trainSongsMelodic = []
     for songInfo in training_data:
         songId = songInfo[0]
         filename = "songs-csv/" + str(songId) + ".csv"
         songNotesAndRhythm = inputSong(filename)
         trainSongsNotes.append([])
         trainSongsNotes[index] = songNotesAndRhythm[0]
-        #trainSongsNotes[index] = padWithZeros(songNotesAndRhythm[0], maxLengthOfSong)
         trainSongsRhythm.append([])
         trainSongsRhythm[index] = songNotesAndRhythm[1]
+        trainSongsMelodic.append([])
+        trainSongsMelodic[index] = songNotesAndRhythm[2]
         songInfo[0] = int(index) #changes the indices in the overview to the 0-179 indices in the array of songs
         index = index + 1
-    return  [trainSongsNotes, trainSongsRhythm]
+    return  [trainSongsNotes, trainSongsRhythm, trainSongsMelodic]
 
 def importTestData(test_data):
     index = 0;
     testSongsNotes = []  # using list to allow different song length
     testSongsRhythm = []
+    testSongsMelodic = []
     for songInfo in test_data:
         songId = songInfo[0]
         filename = "songs-csv/" + str(songId) + ".csv"
@@ -101,9 +104,11 @@ def importTestData(test_data):
         testSongsNotes[index] = songNotesAndRhythm[0]
         testSongsRhythm.append([])
         testSongsRhythm[index] = songNotesAndRhythm[1]
+        testSongsMelodic.append([])
+        testSongsMelodic[index] = songNotesAndRhythm[2]
         songInfo[0] = int(index)  # changes the indices in the overview to the 0-179 indices in the array of songs
         index = index + 1
-    return [testSongsNotes, testSongsRhythm]
+    return [testSongsNotes, testSongsRhythm, testSongsMelodic]
 
 # create 3D array where members of same class are grouped together, e.g. [ [ [..., 'art pepper', ..., ...], [..., 'art pepper', ..., ...] ], [ [..., 'benny carter', ..., ...], [..., 'benny carter', ..., ...] ] ]
 def groupBy(datasetOverview, className):

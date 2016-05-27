@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn import preprocessing
 from sklearn.linear_model import RidgeCV
+from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 from sklearn.svm import SVR
 from sklearn import tree
@@ -29,10 +30,10 @@ def trainAtOnce( echoes, originalSong, discard, alpha):
         #regTree = tree.DecisionTreeRegressor(max_depth=2)
         #trainedRegressor = regTree.fit(echoes, originalSong[discard:])
 #        ridge = RidgeCV(alphas=[alpha])
- #      trainedRegressor = ridge.fit(echoes, originalSong[discard: ])
+#        trainedRegressor = ridge.fit(echoes, originalSong[discard: ])
         #print(trainedRegressor.coef_)
  #       rgr = LinearRegression(fit_intercept=True, normalize = True)
- #       trainedRegressor = rgr.fit(echoes, originalSong[discard: ])
+#        trainedRegressor = rgr.fit(echoes, originalSong[discard: ])
         learnedSignal = trainedRegressor.predict(echoes)
         return(trainedRegressor, learnedSignal)
 
@@ -48,7 +49,7 @@ def extremaMetric(trainingSignals, testSignal):
 
 def compareNewSong( echoesNewSong, trainedSVR, newSong, discard ):
         max_abs_scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))
-        predictedSignal = trainedSVR.predict(echoesNewSong)
+        predictedSignal = max_abs_scaler.fit_transform(trainedSVR.predict(echoesNewSong))
         err = mean_squared_error(predictedSignal, newSong[discard: ])
         return err;
 

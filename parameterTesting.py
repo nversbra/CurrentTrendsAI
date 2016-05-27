@@ -17,15 +17,15 @@ lengthPenalty = []
 random_seed = []
 
 
-iterArray = np.arange(0, 500, 1)
+iterArray = np.arange(0, 100, 1)
 for i in iterArray:
 
-    n_components.append(random.randrange(5, 200, 1))
-    damping.append(random.uniform(0.3, 0.9))
-    weight_scaling.append(random.uniform(0.03, 0.99))
+    n_components.append(random.randrange(10, 100, 10))
+    damping.append(random.uniform(0.5, 0.9))
+    weight_scaling.append(random.uniform(0.10, 0.30))
     n_readouts.append(random.randrange(1, 15, 1))
     discard_steps.append(random.randrange(0, 15, 1))
-    alpha.append(random.uniform(0.1, 0.7))
+    alpha.append(random.uniform(0.3, 0.6))
     lengthPenalty.append(random.uniform(0, 0.15))
     random_seed.append(random.randrange(30000, 50000, 5))
 
