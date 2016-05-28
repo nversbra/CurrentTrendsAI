@@ -6,6 +6,9 @@ from sklearn.linear_model import LinearRegression
 from sklearn import preprocessing
 from itertools import groupby
 import matplotlib.pyplot as plt
+import multiprocessing
+
+
 from array import array
 import numpy as np
 import os
@@ -18,6 +21,8 @@ import Classify
 import scipy.io.wavfile
 from features import mfcc
 from features import logfbank
+from multiprocessing.dummy import Pool as ThreadPool
+
 
 training_data_file = sys.argv[1]
 test_data_file = sys.argv[2]
@@ -31,6 +36,10 @@ if len(sys.argv) > 5:
         alpha = float(sys.argv[9])
         lengthPenalty = float(sys.argv[10])
         random_seed = int(sys.argv[11])
+        if len(sys.argv)>12:
+                threadnumber=int(sys.argv[12])
+        else:
+                threadnumber = 0
 else:
         n_components = 97
         damping = float(0.991127084577083)
@@ -40,6 +49,7 @@ else:
         alpha = float(0.05276771837066035)
         lengthPenalty = float(0.005052682628063044)
         random_seed = int(29001)
+        threadnumber=0
 training_data = Utils.readDataFile(training_data_file)
 test_data = Utils.readDataFile(test_data_file)
 trainData=Utils.importTrainingData(training_data)
@@ -83,12 +93,29 @@ numberOfComposers = 37
 colorList = plt.cm.Dark2(np.linspace(0, 1, numberOfComposers))
 
 
-for s in np.arange(len(training_data)):
-        print(s)
-        trainSong = trainSongsNotes[s]
-        a=[]
+pool = ThreadPool(multiprocessing.cpu_count())
+iterArr=np.arange(len(training_data))
 
-        name = str(s)
+for i in iterArr:
+        SVRs.append([])
+        learnedSignals.append([])
+
+
+#for s in np.arange(len(training_data)):
+def hanldeTrainSongs(s):
+        print(s)
+        global trainSongsNotes
+        global learnedSignals
+        global SVRs
+        global discard
+        global esn
+        global n_readout
+        global n_components
+        global damping, weight_scaling, random_seed, discard
+        trainSong =  trainSongsNotes[s]
+
+        name = str(threadnumber)
+        name += str(s)
         name += '.wav'
         scipy.io.wavfile.write(name, 60,trainSong)
         (rate, sig) = scipy.io.wavfile.read(name)
@@ -98,26 +125,28 @@ for s in np.arange(len(training_data)):
         #inputToReservoir = np.ndarray(shape=(len(trainSong),1), dtype=float, order='F')
         #inputToReservoir[:,0] = trainSong
         #inputToReservoir[:,1] = trainSongRhythm
-        echoes = Classify.collectEchoes(esn, mfcc_feat)
+        c= Classify
+        e=SimpleESN(n_readout, n_components=n_components, damping = damping, weight_scaling = weight_scaling, random_state = random_seed, discard_steps=discard)
+        echoes = c.collectEchoes(e, mfcc_feat)
 
-        training = Classify.trainAtOnce(echoes, trainSong, discard+1)
-        SVRs.append(training[0])
+        training = Classify.trainAtOnce(echoes, trainSong, (discard+1))
+        SVRs[s]=training[0]
         #print(training[0].coef_)
-        learnedSignals.append([])
+
         learnedSignals[s] = training[1]
 
-        if (s < 0):
-                target = training_data[s, 1]
-                targetAsInteger = possibleComposers.index(target)
-                xAxis = np.arange(len(trainSong)-discard)
-                #print(training[1].shape)
-                #print(len(xAxis))
-                plt.plot(xAxis, trainSong[discard : ], color = colorList[targetAsInteger+6] )
-                plt.plot(xAxis, training[1], color = colorList[targetAsInteger] )
-                #plt.plot(xAxis, echoes, color = colorList[targetAsInteger] )
+        # if (s < 0):
+        #         target = training_data[s, 1]
+        #         targetAsInteger = possibleComposers.index(target)
+        #         xAxis = np.arange(len(trainSong)-discard)
+        #         #print(training[1].shape)
+        #         #print(len(xAxis))
+        #         plt.plot(xAxis, trainSong[discard : ], color = colorList[targetAsInteger+6] )
+        #         plt.plot(xAxis, training[1], color = colorList[targetAsInteger] )
+        #         #plt.plot(xAxis, echoes, color = colorList[targetAsInteger] )
 
 #plt.show()
-
+learnedSignals = pool.map(hanldeTrainSongs, iterArr)
 
 
 outFile = open(output_file, 'w')
@@ -127,7 +156,8 @@ for s in np.arange(len(test_data)):
         print(s)
         testSong = testSongsNotes[s]
  #       testSongRhythm = testSongsRhythm[s]
-        name = str(s)
+        name = str(threadnumber)
+        name += str(s)
         name += '.wav'
         scipy.io.wavfile.write(name, 60, testSong)
         (rate, sig) = scipy.io.wavfile.read(name)
