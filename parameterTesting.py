@@ -13,37 +13,38 @@ damping = []
 weight_scaling = []
 discard_steps = []
 alpha = []
-lengthPenalty = []
+timesteps = []
 random_seed = []
 
 
-iterArray = np.arange(0, 1001, 1)
+iterArray = np.arange(0, 100, 1)
 for i in iterArray:
 
-    n_components.append(random.randrange(100, 150, 1))
-    damping.append(random.uniform(0.2, 0.5))
-    weight_scaling.append(random.uniform(0.03, 0.07))
-    n_readouts.append(random.randrange(6, 12, 1))
-    discard_steps.append(random.randrange(10, 15, 1))
-    alpha.append(random.uniform(0.1, 0.3))
-    lengthPenalty.append(random.uniform(0.1, 0.15))
+    n_components.append(random.randrange(10, 150, 10))
+    damping.append(random.uniform(0.1, 0.99))
+    weight_scaling.append(random.uniform(0.1, 0.9))
+    n_readouts.append(random.randrange(1, 12, 1))
+    discard_steps.append(random.randrange(0, 15, 1))
+    alpha.append(random.uniform(0.05, 0.15))
+    timesteps.append(random.randrange(100, 1500, 50))
     random_seed.append(random.randrange(30000, 50000, 5))
 
-iterArray = np.arange(0, 1000, 1)
 testdata=[]
-test = open('test-file.csv', 'rb')
-treader = csv.reader(test, delimiter=',')
+test = open('test-file.csv', 'rt')
+treader = csv.reader(test, delimiter=';')
 for testd in treader:
-    testdata.append(testd[0])
+    testdata.append(testd)
 test.close()
 
-pool = ThreadPool(8)
+print(testdata)
+
+pool = ThreadPool(2)
 
 
-parameters=open('parameters.txt', 'rb')
-reader = csv.reader(parameters, delimiter=',')
+#parameters=open('parameters.txt', 'rb')
+#reader = csv.reader(parameters, delimiter=',')
 
-result = open('result.txt', 'wb')
+result = open('result.txt', 'wt')
 mywriter= csv.writer(result)
 
 
@@ -52,19 +53,19 @@ mywriter= csv.writer(result)
 #    print row
 
 def runDeepBlueNote(k):
-    print k
+    print (k)
 #    print k + '   :   '+ str(n_components[k]) + ' ' + str(damping[k]) + ' ' + str(weight_scaling[k]) + ' ' + str(n_readouts[k]) + ' ' + str(discard_steps[k]) + ' ' + str(alpha[k]) + ' ' + str(lengthPenalty[k]) + ' ' + str(random_seed[k])
-
+    
     command = 'Python DeepBlueNote.py parameters/train/train-'+str(k)+'.csv parameters/test/test-'+str(k)+'.csv parameters/out/out-'+str(k)+'.csv ' + str(n_components[k]) + ' ' + \
-              str(damping[k]) + ' ' + str(weight_scaling[k]) + ' ' + str(n_readouts[k]) + ' ' + str(discard_steps[k]) + ' ' + str(alpha[k]) + ' ' + str(lengthPenalty[k]) + ' ' + str(random_seed[k])
-
-    print command
-    with open(os.devnull, 'wb') as devnull:
+              str(damping[k]) + ' ' + str(weight_scaling[k]) + ' ' + str(n_readouts[k]) + ' ' + str(discard_steps[k]) + ' ' + str(alpha[k]) + ' ' + str(timesteps[k]) + ' ' + str(random_seed[k])
+    print(command)
+    
+    with open(os.devnull, 'wt') as devnull:
        subprocess.check_call(command.split(' '), stdout=devnull, stderr=subprocess.STDOUT)
 
     #os.system(command)
     out= 'parameters/out/out-'+str(k)+'.csv'
-    pred = open(out, 'rb')
+    pred = open(out, 'rt')
     preader = csv.reader(pred, delimiter=',')
     j = 0
     accuracy = 0
@@ -74,7 +75,9 @@ def runDeepBlueNote(k):
     tempo=0
     for prediction in preader:
         p=prediction[0].split(';')
-        t=testdata[j].split(';')
+        #print(p)
+        t=testdata[j]
+        #print(t)
        # print t[0] + p[0]
         if t[1] != p[0]:
             accuracy += 1
@@ -88,13 +91,12 @@ def runDeepBlueNote(k):
         j += 1
 
     pred.close()
-
     #mywriter.writerow([accuracy, n_components[k], damping[k], weight_scaling[k], n_readouts[k], discard_steps[k], alpha[k], lengthPenalty[k]])
-    print "accuraccy: "+ str([k, instrument, style, accuracy, n_components[k], damping[k], weight_scaling[k], n_readouts[k], discard_steps[k], alpha[k], lengthPenalty[k], random_seed[k]])
+    print( "accuraccy: "+ str([k, instrument, style, accuracy, n_components[k], damping[k], weight_scaling[k], n_readouts[k], discard_steps[k], alpha[k], timesteps[k], random_seed[k]]))
     #return str([instrument, style, accuracy])
-    return str([k, instrument, style, accuracy, n_components[k], damping[k], weight_scaling[k], n_readouts[k], discard_steps[k], alpha[k], lengthPenalty[k], random_seed[k]])
+    return str([k, instrument, style, accuracy, n_components[k], damping[k], weight_scaling[k], n_readouts[k], discard_steps[k], alpha[k], timesteps[k], random_seed[k]])
 results = pool.map(runDeepBlueNote, iterArray)
 
 result.close()
 
-print results
+print(results)

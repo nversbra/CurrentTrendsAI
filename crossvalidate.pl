@@ -8,7 +8,7 @@ $noFolds = 5;
 $inputDir = $ARGV[0];
 
 # Read dataset
-open (my $fh, '<', '/Users/Nassim/Documents/CurrentTrendsAI/dataset-balanced.csv');
+open (my $fh, '<', '/Users/Hannah_Pinson/Documents/vub/actual_trends_in_artificial_intelligence/git/dataset-balanced.csv');
     my @lines = <$fh>;
     @lines = @lines[ 1 .. $#lines ]; #skip first line
 close($fh);
@@ -84,4 +84,3 @@ print "Instrument prediction\t" . join(';', @instrumentPerformance) . " => " . s
 print "Style prediction\t" . join(';', @stylePerformance) . " => " . sum(@stylePerformance) ."\n";
 print "Year prediction\t\t" . join(';', @yearPerformance) . " => " . sum(@yearPerformance) ."\n";
 print "Tempo prediction\t" . join(';', @tempoPerformance) . " => " . sum(@tempoPerformance) ."\n";
-
