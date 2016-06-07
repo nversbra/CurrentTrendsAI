@@ -18,6 +18,8 @@ import Classify
 import scipy.io.wavfile
 from features import mfcc
 from features import logfbank
+import multiprocessing
+from multiprocessing.dummy import Pool as Threadpool
 
 training_data_file = sys.argv[1]
 test_data_file = sys.argv[2]
@@ -29,7 +31,7 @@ if len(sys.argv) > 5:
         n_readout = int(sys.argv[7])
         discard = int(sys.argv[8])
         alpha = float(sys.argv[9])
-        timesteps = float(sys.argv[10])
+        timesteps = 1000#float(sys.argv[10])
         random_seed = int(sys.argv[11])
 else:
         n_components = 20
@@ -90,6 +92,8 @@ learnedSignals1 = []
 numberOfComposers = 37
 colorList = plt.cm.Dark2(np.linspace(0, 1, numberOfComposers))
 
+pool=Threadpool(multiprocessing.cpu_count())
+
 print("training phase...")
 
 
@@ -107,10 +111,18 @@ numcep_ = 1
 trained_experts = []
 learned_signals = []
 
-index = 0
+#index = 0
 
-for song in training_data :
-        
+iterArr=np.arange(len(training_data))
+
+for i in iterArr:
+        learned_signals.append([])
+        trained_experts.append([])
+
+#for song in training_data :
+
+def handleTrainSongs(index):
+        song = training_data[index]
         s = int(song[0])
         print(s)
 
@@ -130,21 +142,26 @@ for song in training_data :
         inputMFCC[:,0] = max_abs_scaler.fit_transform(mfcc_f)
         if (s==272):
                 print(inputMFCC)
-        echoes = max_abs_scaler.fit_transform(Classify.collectEchoes(esn, inputMFCC))
+        c=Classify
+        esn = SimpleESN(n_readout, n_components=n_components, damping=damping, weight_scaling=weight_scaling,
+                        random_state=random_seed, discard_steps=discard)
+        echoes = max_abs_scaler.fit_transform(c.collectEchoes(esn, inputMFCC))
         
-        training = Classify.trainAtOnce(echoes, inputMFCC[:,0], discard, alpha)
+        training = c.trainAtOnce(echoes, inputMFCC[:,0], discard, alpha)
         print("model trained")
         expert = training[0]
         signal = training[1]
         signal = Utils.padWithZeros(signal, timesteps)
         signal = signal[0:timesteps]
-        trained_experts.append([])
+        #trained_experts.append([])
         trained_experts[index] = expert
-        learned_signals.append([])
+        #learned_signals.append([])
         learned_signals[index]=signal
         index += 1
+pool.map(handleTrainSongs, iterArr)
 
-        
+
+
 ##        for i in np.arange(numcep_):
 ##                mfcc_f = mfcc_feat[:,i]
 ##                inputMFCC = np.empty(shape=[mfcc_f.shape[0], 1])
@@ -178,7 +195,7 @@ for song in test_data:
         print(s)
 
         predictedSignals = np.empty(shape=[timesteps, numcep_])
-        
+        max_abs_scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))
         name = "songs_midi_indexed/" + str(s)
         name += '.midi.wav'
         (rate, sig) = scipy.io.wavfile.read(name)
@@ -188,7 +205,7 @@ for song in test_data:
         inputMFCC[:,0] = max_abs_scaler.fit_transform(mfcc_f)
         echoesNewSong = max_abs_scaler.fit_transform(Classify.collectEchoes(esn, inputMFCC))
         errors = []
-        for i in np.arange(index):
+        for i in np.arange(len(training_data)):
 #               predictedSignal = Classify.trainAtOnce(echoesNewSong, inputMFCC[:,0], discard, alpha)[1]
 #                predictedSignal = Utils.padWithZeros(predictedSignal, timesteps)
 #                predictedSignal = predictedSignal[0:timesteps]

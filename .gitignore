@@ -30,3 +30,9 @@ crossvalidate.pl
 
 
 *.csv
+
+*.wav
+
+*.midi
+
+songs_midi_indexed/timidity
